@@ -1,14 +1,9 @@
 #include <nana/gui.hpp>
 #include <nana/gui/widgets/label.hpp>
 #include <nana/gui/widgets/button.hpp>
-#include <fmt/format.h>
-#include <gzip/compress.hpp>
-#include <gzip/config.hpp>
-#include <gzip/decompress.hpp>
-#include <gzip/utils.hpp>
-#include <gzip/version.hpp>
-#include <zlib.h>
+#include <format>
 #include "UFile.hpp"
+#include <vector>
 namespace fs = std::filesystem;
 
 void read(ufe::Record& record, ufe::FileBuf& fb)
@@ -21,10 +16,15 @@ int WinMain()
     using namespace nana;
 
     ufe::FileBuf fb{ R"(M:\Games\SteamLibrary\steamapps\common\Underrail\data\rules\items\components\bio\psibeetlecarapace)" };
-    fb.read<uint8_t>();
+    std::vector<std::unique_ptr<ufe::Record>> records;
 
-    ufe::Record header{ ufe::records::SerializationHeaderRecord{} };
-    header.read(fb);
+    ufe::ERecordType rec_type;
+    while ((rec_type = ufe::records::next_record_type(fb)) != ufe::ERecordType::MessageEnd)
+    {
+        records.push_back(ufe::records::create_record(rec_type));
+        records.back()->read(fb);
+    }
+
     ////Define a form.
     //form fm;
 
