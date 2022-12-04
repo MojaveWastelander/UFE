@@ -33,6 +33,9 @@
     <ClInclude Include="Records.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="IndexedData.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="UFE.cpp">
