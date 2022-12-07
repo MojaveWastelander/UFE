@@ -1,0 +1,184 @@
+{
+    "records": [
+        {
+            "class": {
+                "name": "ABCI",
+                "members": {
+                    "I:C": "psiBeetleCarapace",
+                    "I:N": "Psi Beetle Carapace",
+                    "I:Q": {
+                        "class": {
+                            "name": "eIQ",
+                            "members": {
+                                "value__": 1
+                            }
+                        }
+                    },
+                    "I:L": 1,
+                    "I:D": "Carapace of a psi beetle is not only tough, but also acts as an amplifier of psionic activities.",
+                    "I:VM": "Components.186",
+                    "I:MS": 1,
+                    "I:C2": false,
+                    "I:CV": null,
+                    "I:CP": 8,
+                    "I:IVF": null,
+                    "I:CS:Count": 0,
+                    "I:I": true,
+                    "I:R": {
+                        "class": {
+                            "name": "eRC",
+                            "members": {
+                                "value__": 0
+                            }
+                        }
+                    },
+                    "I:S": {
+                        "class": {
+                            "name": "eSC",
+                            "members": {
+                                "value__": 0
+                            }
+                        }
+                    },
+                    "I:T": {
+                        "class": {
+                            "name": "eTC",
+                            "members": {
+                                "value__": 290
+                            }
+                        }
+                    },
+                    "I:W": 2.0,
+                    "I:CR": true,
+                    "CI:SR:Count": 2,
+                    "CI:SR:0": 12,
+                    "CI:SR:1": 13,
+                    "CI:SB:Count": 0,
+                    "CI:CT": {
+                        "class": {
+                            "name": "eCOTY",
+                            "members": {
+                                "value__": 27
+                            }
+                        }
+                    },
+                    "CI:BV": 125,
+                    "CI:AVPQ": 5.0,
+                    "ABCI:DRF:Count": 1,
+                    "ABCI:DRF:0": {
+                        "class": {
+                            "name": "DTF",
+                            "members": {
+                                "C": 2,
+                                "V": 0.15,
+                                "A": 0.0,
+                                "B": 0.0,
+                                "T": {
+                                    "class": {
+                                        "name": "eDMT",
+                                        "members": {
+                                            "value__": 0
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "ABCI:E": 0.1,
+                    "ABCI:M:Count": 0,
+                    "ABCI:S": 7,
+                    "ABCI:SE:Count": 1,
+                    "ABCI:SE:0": 17,
+                    "ABCI:DE:Count": 0
+                }
+            }
+        },
+        {
+            "class": {
+                "name": "PC",
+                "members": {
+                    "PC:P:Count": 5,
+                    "PC:P:0": 18,
+                    "PC:P:1": 19,
+                    "PC:P:2": 20,
+                    "PC:P:3": 21,
+                    "PC:P:4": 22
+                }
+            }
+        },
+        {
+            "class": {
+                "name": "CSR",
+                "members": {
+                    "CSR:SN": "Mechanics",
+                    "CSR:F": 1.0
+                }
+            }
+        },
+        {
+            "class": {
+                "name": "",
+                "members": {
+                    "CSR:SN": "Biology",
+                    "CSR:F": 0.25
+                }
+            }
+        },
+        {
+            "class": {
+                "name": "M27",
+                "members": {
+                    "SE2:P": 0,
+                    "SE2:C": null,
+                    "MSPE:V": -0.2,
+                    "M26:S": null
+                }
+            }
+        },
+        {
+            "class": {
+                "name": "P",
+                "members": {
+                    "P:N": "ArmorPrefix",
+                    "P:V": "Psionic"
+                }
+            }
+        },
+        {
+            "class": {
+                "name": "",
+                "members": {
+                    "P:N": "ArmorDescription",
+                    "P:V": "It's reinforced with psi beetle carapace that somewhat increases the penetration threshold and enhances the wearer's psionic capabilities."
+                }
+            }
+        },
+        {
+            "class": {
+                "name": "",
+                "members": {
+                    "P:N": "Material",
+                    "P:V": "Psi Beetle Carapace"
+                }
+            }
+        },
+        {
+            "class": {
+                "name": "P",
+                "members": {
+                    "P:N": "ShieldMatIndex",
+                    "P:V": 2
+                }
+            }
+        },
+        {
+            "class": {
+                "name": "",
+                "members": {
+                    "P:N": "ShieldShortName",
+                    "P:V": "Psionic Carapace"
+                }
+            }
+        }
+    ]
+}

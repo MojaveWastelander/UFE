@@ -29,12 +29,6 @@ static std::unordered_map<
     std::type_index, std::function<void(std::any const&)>>
     any_visitor{
         to_any_visitor<void>([] { std::cout << "{}"; }),
-        to_any_visitor<int>([](int x) { std::cout << x; }),
-        to_any_visitor<unsigned>([](unsigned x) { std::cout << x; }),
-        to_any_visitor<float>([](float x) { std::cout << x; }),
-        to_any_visitor<double>([](double x) { std::cout << x; }),
-        to_any_visitor<char const*>([](char const* s)
-            { std::cout << std::quoted(s); }),
     // ... add more handlers for your types ...
 };
 
@@ -45,7 +39,7 @@ inline void process(const std::any& a)
         it->second(a);
     }
     else {
-        std::cout << "Unregistered type " << std::quoted(a.type().name());
+        std::cout << "Unregistered type " << std::quoted(a.type().name()) << '\n';
     }
 }
 
@@ -60,11 +54,8 @@ inline void register_any_visitor(F const& f)
 class FileReader;
 
 template <typename T>
-class IndexedData
+struct IndexedData
 {
-public:
-private:
-    friend class FileReader;
     size_t m_offset;
     T m_data;
 };

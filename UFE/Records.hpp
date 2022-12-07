@@ -10,6 +10,8 @@
 #include <variant>
 #include <source_location>
 #include <iostream>
+#include <string_view>
+#include "IndexedData.hpp"
 
 
 namespace ufe
@@ -43,6 +45,8 @@ namespace ufe
         MethodReturn = 22,
         InvalidType = 255
     };
+
+    std::string_view ERecordType2str(ERecordType rec);
 
     enum class EBinaryTypeEnumeration : uint8_t
     {
@@ -96,79 +100,37 @@ namespace ufe
     {
         std::string m_str;
         uint64_t m_original_len;
-        template <class Archive>
-        void load(Archive& archive)
-        {
-            uint32_t len = 0;
-            m_original_len = 0;
-            for (int i = 0; i < 5; ++i)
-            {
-                uint8_t seg;
-                archive(seg);
-                m_original_len |= static_cast<uint64_t>(seg) << (8 * i);
-                len |= static_cast<uint32_t>(seg & 0x7F) << (7 * i);
-                if ((seg & 0x80) == 0x00) break;
-            }
-            m_str.resize(len);
-            archive(m_str);
-        }
     };
 
     struct ClassInfo
     {
-        int32_t ObjectId;
-        LengthPrefixedString Name;
-        int32_t MemberCount;
-        std::vector<LengthPrefixedString> MemberNames;
-        template<class Archive>
-        void serialize(Archive& archive)
-        {
-            archive(ObjectId, Name, MemberCount);
-            MemberNames.resize(MemberCount);
-            archive(MemberNames);
-        }
+        IndexedData<int32_t> ObjectId;
+        IndexedData<LengthPrefixedString> Name;
+        IndexedData<int32_t> MemberCount;
+        std::vector<IndexedData<LengthPrefixedString>> MemberNames;
     };
 
     struct ClassTypeInfo
     {
         LengthPrefixedString TypeName;
         int32_t LibraryId;
-        template<class Archive>
-        void serialize(Archive& archive)
-        {
-            archive(TypeName, LibraryId);
-        }
     };
 
     struct BinaryObjectString
     {
         int32_t m_ObjectId;
-        LengthPrefixedString m_Value;
-        template<class Archive>
-        void serialize(Archive& archive)
-        {
-            archive(m_ObjectId, m_Value);
-        }
+        IndexedData<LengthPrefixedString> m_Value;
     };
 
     struct MemberReference
     {
         int32_t m_idRef;
-        template<class Archive>
-        void serialize(Archive& archive)
-        {
-            archive(m_idRef);
-        }
     };    
 
     struct ObjectNull
     {
-        template<class Archive>
-        void serialize(Archive& archive)
-        {
-        }
     };
-    class ClassWithMembersAndTypes;
+    struct ClassWithMembersAndTypes;
     using AdditionalInfosType = std::variant<EPrimitiveTypeEnumeration, LengthPrefixedString, ClassTypeInfo>;
     using ClassMembersData = std::variant<uint8_t, int32_t, double, float, bool, LengthPrefixedString, ClassTypeInfo, BinaryObjectString, ClassWithMembersAndTypes, MemberReference, ObjectNull>;
 
@@ -177,7 +139,7 @@ namespace ufe
         std::vector<EBinaryTypeEnumeration> BinaryTypeEnums;
         std::vector<AdditionalInfosType> AdditionalInfos;
         int32_t LibraryId;
-        std::vector<ClassMembersData> Data;
+        std::vector<std::any> Data;
         void reserve(int size)
         {
             // filled by cereal
@@ -186,234 +148,33 @@ namespace ufe
             AdditionalInfos.reserve(size);
             Data.reserve(size);
         }
-        template<class Archive>
-        void load(Archive& archive)
-        {
-            archive(BinaryTypeEnums);
-            uint8_t prim_type;
-            for (auto type : BinaryTypeEnums)
-            {
-                switch (type)
-                {
-                    case ufe::EBinaryTypeEnumeration::Primitive:
-                    {
-                        archive(prim_type);
-                        AdditionalInfos.push_back(static_cast<EPrimitiveTypeEnumeration>(prim_type));
-                    } break;
-                    case ufe::EBinaryTypeEnumeration::String:
-                        break;
-                    case ufe::EBinaryTypeEnumeration::Object:
-                        break;
-                    case ufe::EBinaryTypeEnumeration::SystemClass:
-                    {
-                        LengthPrefixedString str;
-                        archive(str);
-                        AdditionalInfos.push_back(str);
-                    } break;
-                    case ufe::EBinaryTypeEnumeration::Class:
-                    {
-                        ClassTypeInfo cti;
-                        archive(cti);
-                        AdditionalInfos.push_back(cti);
-                    } break;
-                    case ufe::EBinaryTypeEnumeration::ObjectArray:
-                        break;
-                    case ufe::EBinaryTypeEnumeration::StringArray:
-                        break;
-                    case ufe::EBinaryTypeEnumeration::PrimitiveArray:
-                        break;
-                    case ufe::EBinaryTypeEnumeration::None:
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-            archive(LibraryId);
-
-            auto it_add_info = AdditionalInfos.cbegin();
-
-            for (auto type : BinaryTypeEnums)
-            {
-                switch (type)
-                {
-                    case ufe::EBinaryTypeEnumeration::Primitive:
-                    {                        
-                        switch (std::get<EPrimitiveTypeEnumeration>(*it_add_info))
-                        {
-                            case ufe::EPrimitiveTypeEnumeration::Boolean:
-                            {
-                                bool tmp;
-                                archive(tmp);
-                                Data.push_back(tmp);
-                            } break;
-                            case ufe::EPrimitiveTypeEnumeration::Byte:
-                                break;
-                            case ufe::EPrimitiveTypeEnumeration::Char:
-                                break;
-                            case ufe::EPrimitiveTypeEnumeration::Decimal:
-                                break;
-                            case ufe::EPrimitiveTypeEnumeration::Double:
-                            {
-                                double tmp;
-                                archive(tmp);
-                                Data.push_back(tmp);
-                            } break;
-                            case ufe::EPrimitiveTypeEnumeration::Int16:
-                                break;
-                            case ufe::EPrimitiveTypeEnumeration::Int32:
-                            {
-                                int32_t tmp;
-                                archive(tmp);
-                                Data.push_back(tmp);
-                            } break;
-                            case ufe::EPrimitiveTypeEnumeration::Int64:
-                                break;
-                            case ufe::EPrimitiveTypeEnumeration::SByte:
-                                break;
-                            case ufe::EPrimitiveTypeEnumeration::Single:
-                            {
-                                float tmp;
-                                archive(tmp);
-                                Data.push_back(tmp);
-                            } break;
-                            case ufe::EPrimitiveTypeEnumeration::TimeSpan:
-                                break;
-                            case ufe::EPrimitiveTypeEnumeration::DateTime:
-                                break;
-                            case ufe::EPrimitiveTypeEnumeration::UInt16:
-                                break;
-                            case ufe::EPrimitiveTypeEnumeration::UInt32:
-                                break;
-                            case ufe::EPrimitiveTypeEnumeration::UInt64:
-                                break;
-                            case ufe::EPrimitiveTypeEnumeration::Null:
-                                break;
-                            case ufe::EPrimitiveTypeEnumeration::String:
-                                break;
-                            default:
-                                break;
-                        }
-                        ++it_add_info;
-                    } break;
-                    case ufe::EBinaryTypeEnumeration::String:
-                    {
-                        TypeRecord tr;
-                        archive(tr);
-                        BinaryObjectString bos;
-                        archive(bos);
-                        Data.push_back(bos);
-                    } break;
-                    case ufe::EBinaryTypeEnumeration::Object:
-                    {
-                        TypeRecord tr;
-                        archive(tr);
-                        switch (tr.type())
-                        {
-                            case ERecordType::MemberReference:
-                            {
-                                MemberReference mref;
-                                archive(mref);
-                                Data.push_back(mref);
-                            } break;
-                            case ERecordType::ObjectNull:
-                            {
-                                Data.push_back(ObjectNull{});
-                            } break;
-                            default:
-                                log_line("Object type skipped");
-                        }
-                    } break;
-                    case ufe::EBinaryTypeEnumeration::SystemClass:
-                    {
-                        ++it_add_info;
-                    } break;
-                    case ufe::EBinaryTypeEnumeration::Class:
-                    {
-                        TypeRecord tr;
-                        archive(tr);
-                        switch (tr.type())
-                        {
-                            case ERecordType::ClassWithMembersAndTypes:
-                            {
-                                ClassWithMembersAndTypes cls;
-                                archive(cls);
-                                Data.push_back(cls);
-                            } break;
-                            case ERecordType::MemberReference:
-                            {
-                                MemberReference mref;
-                                archive(mref);
-                                Data.push_back(mref);
-                            } break;
-                            default:
-                                break;
-                        }
-                        ++it_add_info;
-                    } break;
-                    case ufe::EBinaryTypeEnumeration::ObjectArray:
-                        break;
-                    case ufe::EBinaryTypeEnumeration::StringArray:
-                        break;
-                    case ufe::EBinaryTypeEnumeration::PrimitiveArray:
-                        break;
-                    case ufe::EBinaryTypeEnumeration::None:
-                        break;
-                    default:
-                        break;
-                }
-            }
-        }
     };
 
+    class FileReader;
 
-    class SerializationHeaderRecord
+    struct SerializationHeaderRecord
     {
-    public:
-        template<class Archive>
-        void serialize(Archive& archive)
-        {
-            archive(RootId, HeaderId, MajorVersion, MinorVersion);
-        }
-    private:
-        int32_t RootId;
-        int32_t HeaderId;
-        int32_t MajorVersion;
-        int32_t MinorVersion;
+        IndexedData<int32_t> RootId;
+        IndexedData<int32_t> HeaderId;
+        IndexedData<int32_t> MajorVersion;
+        IndexedData<int32_t> MinorVersion;
     };
 
-    class BinaryLibrary
+    struct BinaryLibrary
     {
-    public:
-        template<class Archive>
-        void serialize(Archive& archive)
-        {
-            archive(LibraryId, LibraryName);
-        }
-    private:
-        int32_t LibraryId;
-        LengthPrefixedString LibraryName;
+        IndexedData<int32_t> LibraryId;
+        IndexedData<LengthPrefixedString> LibraryName;
     };
 
-    class ClassWithMembersAndTypes
+    struct ClassWithMembersAndTypes
     {
-    public:
-        template<class Archive>
-        void serialize(Archive& archive)
-        {
-            archive(m_ClassInfo);
-            m_MemberTypeInfo.reserve(m_ClassInfo.MemberCount);
-            archive(m_MemberTypeInfo);
-        }
-    private:
         ClassInfo m_ClassInfo;
         MemberTypeInfo m_MemberTypeInfo;
     };
 
-    class ClassWithId
+    struct ClassWithId
     {
-    public:
-    private:
+        IndexedData<int32_t> MetadataId;
         ClassInfo m_ClassInfo;
         MemberTypeInfo m_MemberTypeInfo;
     };
