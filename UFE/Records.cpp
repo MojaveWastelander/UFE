@@ -39,3 +39,49 @@ std::string_view ufe::ERecordType2str(ERecordType rec)
             return "InvalidType";
     }
 }
+
+
+std::string_view ufe::EPrimitiveTypeEnumeration2str(EPrimitiveTypeEnumeration rec)
+{
+    switch (rec)
+    {
+        case EPrimitiveTypeEnumeration::Boolean: return "Boolean";
+        case EPrimitiveTypeEnumeration::Byte: return "Byte";
+        case EPrimitiveTypeEnumeration::Char: return "Char";
+        case EPrimitiveTypeEnumeration::Decimal: return "Decimal";
+        case EPrimitiveTypeEnumeration::Double: return "Double";
+        case EPrimitiveTypeEnumeration::Int16: return "Int16";
+        case EPrimitiveTypeEnumeration::Int32: return "Int32";
+        case EPrimitiveTypeEnumeration::Int64: return "Int64";
+        case EPrimitiveTypeEnumeration::SByte: return "SByte";
+        case EPrimitiveTypeEnumeration::Single: return "Single";
+        case EPrimitiveTypeEnumeration::TimeSpan: return "TimeSpan";
+        case EPrimitiveTypeEnumeration::DateTime: return "DateTime";
+        case EPrimitiveTypeEnumeration::UInt16: return "UInt16";
+        case EPrimitiveTypeEnumeration::UInt32: return "UInt32";
+        case EPrimitiveTypeEnumeration::UInt64: return "UInt64";
+        case EPrimitiveTypeEnumeration::Null: return "Null";
+        case EPrimitiveTypeEnumeration::String: return "String";
+        default:
+            return "InvalidType";
+    }
+
+}
+
+std::string_view ufe::EBinaryTypeEnumeration2str(EBinaryTypeEnumeration rec)
+{
+    switch (rec)
+    {
+        case EBinaryTypeEnumeration::Primitive: return "Primitive";
+        case EBinaryTypeEnumeration::String: return "String";
+        case EBinaryTypeEnumeration::Object: return "Object";
+        case EBinaryTypeEnumeration::SystemClass: return "SystemClass";
+        case EBinaryTypeEnumeration::Class: return "Class";
+        case EBinaryTypeEnumeration::ObjectArray: return "ObjectArray";
+        case EBinaryTypeEnumeration::StringArray: return "StringArray";
+        case EBinaryTypeEnumeration::PrimitiveArray: return "PrimitiveArray";
+        case EBinaryTypeEnumeration::None: return "None";
+        default:
+            return "InvalidType";
+    }
+}

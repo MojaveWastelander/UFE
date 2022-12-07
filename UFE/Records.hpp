@@ -60,6 +60,7 @@ namespace ufe
         PrimitiveArray = 7,
         None
     };
+    std::string_view EBinaryTypeEnumeration2str(EBinaryTypeEnumeration rec);
 
     enum class EPrimitiveTypeEnumeration
     {
@@ -81,6 +82,8 @@ namespace ufe
         Null = 17,
         String = 18
     };
+    std::string_view EPrimitiveTypeEnumeration2str(EPrimitiveTypeEnumeration rec);
+
     using PrimitiveData = std::variant<uint8_t, int32_t, double, float, bool>;
 
     class TypeRecord

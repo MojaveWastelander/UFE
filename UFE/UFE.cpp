@@ -11,6 +11,7 @@
 #include <cereal/types/string.hpp>
 #include <cereal/types/variant.hpp>
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 
 //int xmain()
 //{
@@ -59,20 +60,23 @@
 //    }
 //}
 
-int main()
+int main(int arg, char** argv)
 { 
-	std::filesystem::path item_path = R"(M:\Games\SteamLibrary\steamapps\common\Underrail\data\rules\items\components\bio\psibeetlecarapace)";
-	FileReader reader;
-	reader.open(item_path);
-	reader.read_records();
-	std::vector<std::any> v;
-	std::any a;
-	//for (std::any a = reader.read_record(); a.has_value(); a = reader.read_record())
-	//{
-	//	v.push_back(std::move(a));
-	//}
+	std::filesystem::path item_path = argv[1];
+	std::filesystem::path item_path2 = R"(M:\Games\SteamLibrary\steamapps\common\Underrail\data\rules\items\components\bio\psibeetlecarapace2)";
+	spdlog::set_level(spdlog::level::debug);
+	{
+		FileReader reader;
+		if (reader.open(item_path))
+		{
+			reader.read_records();
 
-	reader.export_json();
+			reader.export_json(item_path += ".json");
+		}
+	}
+	//fs::path json_path("__psibeetlecarapace.json");
+	//FileWriter writer;
+	//writer.update_file(item_path2, json_path);
 //	
 //	register_any_visitor<ufe::SerializationHeaderRecord>([](const ufe::SerializationHeaderRecord& head)
 //		{

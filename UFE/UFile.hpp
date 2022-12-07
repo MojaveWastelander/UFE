@@ -7,6 +7,7 @@
 #include "IndexedData.hpp"
 #include <any>
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 //#include <gzip/compress.hpp>
 //#include <gzip/config.hpp>
 //#include <gzip/decompress.hpp>
@@ -18,15 +19,6 @@
 
 namespace fs = std::filesystem;
 
-class FileWriter
-{
-    bool update_file(fs::path& binary_file, fs::path& json_file);
-private:
-    std::ifstream m_file;
-    fs::path m_file_path;
-    nlohmann::ordered_json m_export;
-};
-
 class FileReader
 {
 public:
@@ -34,6 +26,7 @@ public:
     {
         if (fs::exists(file_path) && fs::is_regular_file(file_path))
         {
+            std::cout << "Reading file: " << file_path << '\n';
             m_file.open(file_path, std::ios::binary);
 
             // init json
@@ -49,9 +42,10 @@ public:
         return false;
     }
 
-    bool export_json()
+    bool export_json(fs::path json_path)
     {
-        std::ofstream out{ "__psibeetlecarapace.json" };
+        std::ofstream out{ json_path };
+        std::cout << "Saving json file: " << json_path << '\n';
         out << std::setw(4) << m_export;
         return true;
     }
@@ -79,7 +73,7 @@ public:
     std::any read_record(nlohmann::ordered_json& obj)
     {
         ufe::ERecordType rec = get_record_type();
-        ufe::log_line(std::format("Parsing record: {}", ufe::ERecordType2str(rec)));
+        spdlog::info("Parsing record type: {}", ufe::ERecordType2str(rec));
         switch (rec)
         {
             case ufe::ERecordType::SerializedStreamHeader:
@@ -99,7 +93,12 @@ public:
             case ufe::ERecordType::ClassWithMembers:
                 break;
             case ufe::ERecordType::SystemClassWithMembersAndTypes:
-                break;
+            {
+                ufe::ClassWithMembersAndTypes cmt;
+                read(cmt, obj, true);
+                add_record(cmt.m_ClassInfo.ObjectId.m_data, std::any{ cmt });
+                return std::any{ std::move(cmt) };
+            } break;
             case ufe::ERecordType::ClassWithMembersAndTypes:
             {
                 ufe::ClassWithMembersAndTypes cmt;
@@ -111,6 +110,7 @@ public:
             {
                 ufe::BinaryObjectString bos;
                 read(bos);
+                spdlog::debug("object string id: {}, value: '{}'", bos.m_ObjectId, bos.m_Value.m_data.m_str);
                 add_record(bos.m_ObjectId, std::any{ bos });
                 return std::any{ std::move(bos) };
             } break;
@@ -122,6 +122,7 @@ public:
             {
                 ufe::MemberReference ref;
                 read(ref);
+                spdlog::debug("reference id: {}", ref.m_idRef);
                 obj["reference"] = ref.m_idRef;
                 return std::any{ std::move(ref) };
             } break;
@@ -183,25 +184,18 @@ public:
     {
         static_assert(std::is_fundamental_v<T>, "Type doesn't have specialization");
         data.m_offset = m_file.tellg();
-        auto cnt = m_file.readsome(reinterpret_cast<char*>(&data.m_data), sizeof(data.m_data));
-        return cnt == sizeof(data.m_data);
+        m_file.read(reinterpret_cast<char*>(&data.m_data), sizeof(data.m_data));
+        return true;
     }
 
     template<>
     bool read<ufe::LengthPrefixedString>(IndexedData<ufe::LengthPrefixedString>& lps);
 
-    bool read(ufe::SerializationHeaderRecord& header)
-    {
-        read(header.RootId);
-        read(header.HeaderId);
-        read(header.MajorVersion);
-        read(header.MinorVersion);
-        return true;
-    }
+    bool read(ufe::SerializationHeaderRecord& header);
     bool read(ufe::BinaryLibrary& bl);
     bool read(ufe::ClassInfo& ci);
     bool read(ufe::MemberTypeInfo& mti);
-    bool read(ufe::ClassWithMembersAndTypes& cmt, nlohmann::ordered_json& obj);
+    bool read(ufe::ClassWithMembersAndTypes& cmt, nlohmann::ordered_json& obj, bool system_class = false);
     bool read(ufe::ClassWithId& cmt, nlohmann::ordered_json& obj);
     bool read(ufe::LengthPrefixedString& lps);
     bool read(ufe::ClassTypeInfo& cti);
@@ -229,6 +223,7 @@ public:
     {
         T tmp = read<T>();
         obj[it_member_names->m_data.m_str] = tmp;
+        spdlog::debug("\t{} = {}", it_member_names->m_data.m_str, tmp);
         mti.Data.push_back(std::any{ tmp });
     }
 
@@ -239,6 +234,68 @@ private:
     fs::path m_file_path;
     nlohmann::ordered_json m_export;
 };
+
+class FileWriter
+{
+public:
+    bool update_file(fs::path& binary_file, fs::path& json_file);
+private:
+    bool read_record(nlohmann::ordered_json& obj);
+    bool read(ufe::MemberTypeInfo& mti);
+    bool read(ufe::ClassWithMembersAndTypes& cmt, nlohmann::ordered_json& obj);
+    bool read(ufe::ClassWithId& cmt, nlohmann::ordered_json& obj);
+    bool read(ufe::ClassTypeInfo& cti);
+    bool read(ufe::BinaryObjectString& bos);
+
+    void update_members_data(ufe::MemberTypeInfo& mti, ufe::ClassInfo& ci, nlohmann::ordered_json& obj);
+    nlohmann::ordered_json& find_class(std::string name, nlohmann::ordered_json& obj, int ref_id = 0)
+    {
+        static nlohmann::ordered_json dummy;
+
+        // looking for a ClassWithId records
+        // searching by name and id
+        if (ref_id)
+        {
+        }
+
+        // nested class not in array
+        if (obj["class"]["name"] == name)
+        {
+            return obj;
+        }
+
+        for (auto& rec : obj["records"])
+        {
+            if (rec["class"]["name"] == name)
+            {
+                return rec;
+            }
+        }
+        return dummy;
+    }
+    template <typename T>
+    void process_member(nlohmann::ordered_json& obj, const std::string& name)
+    {
+        IndexedData<T> tmp;
+        m_reader.read(tmp);
+        try
+        {
+            T jtmp = obj[name].get<T>();
+            m_file.seekg(tmp.m_offset);
+            m_file.write(reinterpret_cast<char*>(&jtmp), sizeof(T));
+        }
+        catch (std::exception& e)
+        {
+            std::cerr << e.what() << '\n' << obj.dump() << '\n' << obj[name] << '\n';
+        }
+    }
+    std::fstream m_file;
+    fs::path m_file_path;
+    FileReader m_reader;
+    std::vector <IndexedData<ufe::LengthPrefixedString>> m_updated_strings;
+    nlohmann::ordered_json m_export;
+};
+
 
 
 class UFile
