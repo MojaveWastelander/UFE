@@ -103,7 +103,26 @@ namespace ufe
     {
         std::string m_str;
         uint64_t m_original_len;
+        uint64_t m_new_len = 0;
+        void update_string(const std::string& s)
+        {
+            if (m_str != s)
+            {
+                uint64_t tmp = s.size();
+                for (int i = 0; tmp; tmp >>= 7)
+                {
+                    m_new_len |= (tmp & 0x7F) << (8 * i);
+                    if (tmp >> 7)
+                    {
+                        m_new_len |= 0x80 << (8 * i);
+                    }
+                }
+                m_str = s;
+            }
+        }
     };
+
+    bool operator==(const LengthPrefixedString& lhs, const std::string& rhs);
 
     struct ClassInfo
     {

@@ -63,20 +63,23 @@
 int main(int arg, char** argv)
 { 
 	std::filesystem::path item_path = argv[1];
-	std::filesystem::path item_path2 = R"(M:\Games\SteamLibrary\steamapps\common\Underrail\data\rules\items\components\bio\psibeetlecarapace2)";
+	std::filesystem::path json_path = argv[1];
+	std::filesystem::path item_path2 = R"(M:\Games\SteamLibrary\steamapps\common\Underrail\data\rules_2\items\armor\biohazardsuit)";
+
 	spdlog::set_level(spdlog::level::debug);
+
+	json_path += ".json";
 	{
-		FileReader reader;
+		FileParser reader;
 		if (reader.open(item_path))
 		{
 			reader.read_records();
 
-			reader.export_json(item_path += ".json");
+			//reader.export_json(json_path);
 		}
 	}
-	//fs::path json_path("__psibeetlecarapace.json");
-	//FileWriter writer;
-	//writer.update_file(item_path2, json_path);
+	FileWriter writer;
+	writer.update_file(item_path2, json_path);
 //	
 //	register_any_visitor<ufe::SerializationHeaderRecord>([](const ufe::SerializationHeaderRecord& head)
 //		{
