@@ -128,20 +128,23 @@ private:
         m_reader.read(tmp);
         try
         {
-            T jtmp = obj[name].get<T>();
-            spdlog::debug("{} => {}", name, obj.dump());
-            if (obj.contains(name))
+            if (!obj.contains(name))
             {
-                spdlog::debug("{} => {}", tmp.m_data, obj[name].dump());
+                spdlog::error("Member '{}' doesn't exists in current context:  {}", name, obj.dump());
+            }
+            else
+            {
+                T jtmp = obj[name].get<T>();
+                memcpy(reinterpret_cast<void*>(&m_raw_data[tmp.m_offset]), reinterpret_cast<void*>(&jtmp), sizeof(T));
             }
             //m_reader.write(reinterpret_cast<const char*>(&jtmp), sizeof(jtmp), tmp.m_offset);
             //m_reader.seek(tmp.m_offset);
             //m_reader.read(tmp);
-            memcpy(reinterpret_cast<void*>(&m_raw_data[tmp.m_offset]), reinterpret_cast<void*>(&jtmp), sizeof(T));
         }
         catch (std::exception& e)
         {
-            std::cerr << e.what() << '\n' << obj.dump() << '\n' << obj[name] << '\n';
+            spdlog::error("Member '{}' update error: {}", name, e.what());
+            //std::cerr << e.what() << '\n' << obj.dump() << '\n' << obj[name] << '\n';
         }
     }
     std::fstream m_file;

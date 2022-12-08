@@ -18,6 +18,10 @@ bool FileParser::open(fs::path file_path)
 
         return true;
     }
+    else
+    {
+        spdlog::error("Failed to open '{}'", file_path.string());
+    }
     return false;
 }
 
@@ -74,8 +78,10 @@ std::any FileParser::read_record(nlohmann::ordered_json& obj)
             return std::any{ std::move(cwi) };
         } break;
         case ufe::ERecordType::SystemClassWithMembers:
+            spdlog::error("Record type not implemented!");
             break;
         case ufe::ERecordType::ClassWithMembers:
+            spdlog::error("Record type not implemented!");
             break;
         case ufe::ERecordType::SystemClassWithMembersAndTypes:
         {
@@ -100,15 +106,25 @@ std::any FileParser::read_record(nlohmann::ordered_json& obj)
             return std::any{ std::move(bos) };
         } break;
         case ufe::ERecordType::BinaryArray:
+            spdlog::error("Record type not implemented!");
             break;
         case ufe::ERecordType::MemberPrimitiveTyped:
+            spdlog::error("Record type not implemented!");
             break;
         case ufe::ERecordType::MemberReference:
         {
             ufe::MemberReference ref;
             read(ref);
             spdlog::debug("reference id: {}", ref.m_idRef);
-            obj["reference"] = ref.m_idRef;
+            try
+            {
+                obj["reference"] = ref.m_idRef;
+            }
+            catch (std::exception& e)
+            {
+                spdlog::error("Reference parse error: {}", e.what());
+                spdlog::debug(obj.dump());
+            }
             return std::any{ std::move(ref) };
         } break;
         case ufe::ERecordType::ObjectNull:
@@ -126,22 +142,16 @@ std::any FileParser::read_record(nlohmann::ordered_json& obj)
             return std::any{ std::move(bl) };
         } break;
         case ufe::ERecordType::ObjectNullMultiple256:
-            break;
         case ufe::ERecordType::ObjectNullMultiple:
-            break;
         case ufe::ERecordType::ArraySinglePrimitive:
-            break;
         case ufe::ERecordType::ArraySingleObject:
-            break;
         case ufe::ERecordType::ArraySingleString:
-            break;
         case ufe::ERecordType::MethodCall:
-            break;
         case ufe::ERecordType::MethodReturn:
-            break;
         case ufe::ERecordType::InvalidType:
-            break;
         default:
+            spdlog::error("Record type not implemented!");
+            spdlog::debug("filepos: {}", m_file.tellg());
             break;
     }
     return std::any{};
@@ -216,9 +226,14 @@ bool FileParser::read(ufe::ClassWithMembersAndTypes& cmt, nlohmann::ordered_json
             } break;
             case ufe::EBinaryTypeEnumeration::ObjectArray:
             case ufe::EBinaryTypeEnumeration::StringArray:
+                break;
             case ufe::EBinaryTypeEnumeration::PrimitiveArray:
+            {
+                auto ptype = static_cast<ufe::EPrimitiveTypeEnumeration>(read());
+                mti.AdditionalInfos.push_back(ptype);
+                spdlog::debug("\t{} -> {}", ufe::EBinaryTypeEnumeration2str(type), ufe::EPrimitiveTypeEnumeration2str(ptype));
+            } break;
             case ufe::EBinaryTypeEnumeration::None:
-                spdlog::debug("\t{}", ufe::EBinaryTypeEnumeration2str(type));
                 break;
             default:
                 break;
@@ -440,8 +455,6 @@ void FileParser::read_members_data(ufe::MemberTypeInfo& mti, ufe::ClassInfo& ci,
                 mti.Data.push_back(nested_data);
                 // read_record adds new record in json as array, this will add it as object for nested classes
                 // and in case of not null objects
-                spdlog::debug(tmp.dump());
-                spdlog::debug(tmp.front().dump());
                 if (!tmp.empty())
                 {
                     if (nested_data.type() == typeid(ufe::ClassWithMembersAndTypes) || nested_data.type() == typeid(ufe::ClassWithId))
@@ -458,13 +471,13 @@ void FileParser::read_members_data(ufe::MemberTypeInfo& mti, ufe::ClassInfo& ci,
                 ++it_add_info;
             } break;
             case ufe::EBinaryTypeEnumeration::ObjectArray:
-                break;
             case ufe::EBinaryTypeEnumeration::StringArray:
-                break;
             case ufe::EBinaryTypeEnumeration::PrimitiveArray:
-                break;
             case ufe::EBinaryTypeEnumeration::None:
-                break;
+            {
+                obj[it_member_names->m_data.m_str] = {};
+                mti.Data.push_back(read_record(obj[it_member_names->m_data.m_str]));
+            } break;
             default:
                 break;
         }
