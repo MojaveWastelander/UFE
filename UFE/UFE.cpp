@@ -79,8 +79,8 @@ int main(int arg, char** argv)
 			reader.export_json(json_path);
 		}
 	}
-	FileWriter writer;
-	writer.update_file(item_path2, json_path);
+	//FileWriter writer;
+	//writer.update_file(item_path2, json_path);
 //	
 //	register_any_visitor<ufe::SerializationHeaderRecord>([](const ufe::SerializationHeaderRecord& head)
 //		{

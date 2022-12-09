@@ -166,6 +166,10 @@ namespace ufe
     struct ObjectNull
     {
     };
+
+    struct ObjectNullMultiple256
+    {
+    };
     struct ClassWithMembersAndTypes;
     using AdditionalInfosType = std::variant<EPrimitiveTypeEnumeration, LengthPrefixedString, ClassTypeInfo>;
     using ClassMembersData = std::variant<uint8_t, int32_t, double, float, bool, LengthPrefixedString, ClassTypeInfo, BinaryObjectString, ClassWithMembersAndTypes, MemberReference, ObjectNull>;

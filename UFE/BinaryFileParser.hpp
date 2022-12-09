@@ -12,6 +12,12 @@
 
 namespace fs = std::filesystem;
 
+struct AnyJson 
+{
+    std::any dyn_obj;
+    nlohmann::ordered_json json_obj;
+};
+
 class BinaryFileParser
 {
 public:
@@ -23,7 +29,7 @@ public:
 
     void read_records();
 
-    std::any read_record(nlohmann::ordered_json& obj);
+    AnyJson read_record();
 
     void read_primitive_element(ufe::EPrimitiveTypeEnumeration type, nlohmann::ordered_json& obj);
 
@@ -104,5 +110,5 @@ private:
     std::vector<std::pair<int32_t, std::any>> m_records;
     std::fstream m_file;
     fs::path m_file_path;
-    nlohmann::ordered_json m_export;
+    nlohmann::ordered_json m_json;
 };
