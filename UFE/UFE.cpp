@@ -1,5 +1,4 @@
 #include <format>
-#include "UFile.hpp"
 #include <vector>
 #include <fstream>
 #include <string>
@@ -12,6 +11,8 @@
 #include <cereal/types/variant.hpp>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+#include "FileWriter.hpp"
+#include "BinaryFileParser.hpp"
 
 //int xmain()
 //{
@@ -70,7 +71,7 @@ int main(int arg, char** argv)
 
 	json_path += ".json";
 	{
-		FileParser reader;
+		BinaryFileParser reader;
 		if (reader.open(item_path))
 		{
 			reader.read_records();
@@ -78,8 +79,8 @@ int main(int arg, char** argv)
 			reader.export_json(json_path);
 		}
 	}
-	//FileWriter writer;
-	//writer.update_file(item_path2, json_path);
+	FileWriter writer;
+	writer.update_file(item_path2, json_path);
 //	
 //	register_any_visitor<ufe::SerializationHeaderRecord>([](const ufe::SerializationHeaderRecord& head)
 //		{

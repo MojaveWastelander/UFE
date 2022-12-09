@@ -51,7 +51,7 @@ inline void register_any_visitor(F const& f)
     any_visitor.insert(to_any_visitor<T>(f));
 }
 
-class FileParser;
+class BinaryFileParser;
 
 template <typename T>
 struct IndexedData

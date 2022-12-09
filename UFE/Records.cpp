@@ -90,3 +90,8 @@ std::string_view ufe::EBinaryTypeEnumeration2str(EBinaryTypeEnumeration rec)
             return "InvalidType";
     }
 }
+
+double float2str2double(float f)
+{
+    return std::stold(std::to_string(f));
+}

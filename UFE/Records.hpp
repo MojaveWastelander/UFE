@@ -14,6 +14,10 @@
 #include "IndexedData.hpp"
 
 
+// json uses double internally and float->double casts are imprecise
+// thus corverting via strings
+double float2str2double(float f);
+
 namespace ufe
 {
     namespace fs = std::filesystem;
@@ -83,6 +87,16 @@ namespace ufe
         String = 18
     };
     std::string_view EPrimitiveTypeEnumeration2str(EPrimitiveTypeEnumeration rec);
+
+    enum class EBinaryArrayTypeEnumeration
+    {
+        Single,
+        Jagged,
+        Rectangular,
+        SingleOffset,
+        JaggedOffset,
+        RectangularOffset
+    };
 
     using PrimitiveData = std::variant<uint8_t, int32_t, double, float, bool>;
 
@@ -155,6 +169,32 @@ namespace ufe
     struct ClassWithMembersAndTypes;
     using AdditionalInfosType = std::variant<EPrimitiveTypeEnumeration, LengthPrefixedString, ClassTypeInfo>;
     using ClassMembersData = std::variant<uint8_t, int32_t, double, float, bool, LengthPrefixedString, ClassTypeInfo, BinaryObjectString, ClassWithMembersAndTypes, MemberReference, ObjectNull>;
+
+    struct BinaryArray
+    {
+        int32_t ObjectId;
+        EBinaryArrayTypeEnumeration BinaryArrayTypeEnum;
+        int32_t Rank;
+        std::vector<int32_t> Lengths;
+        std::vector<int32_t> LowerBounds;
+        EBinaryTypeEnumeration TypeEnum;
+        AdditionalInfosType AdditionalTypeInfo;
+    };
+
+    struct ArraySingleString
+    {
+        int32_t ObjectId;
+        int32_t Length;
+        std::vector<std::any> Data;
+    };
+    
+    struct ArraySinglePrimitive
+    {
+        int32_t ObjectId;
+        int32_t Length;
+        EPrimitiveTypeEnumeration PrimitiveTypeEnum;
+        std::vector<std::any> Data;
+    };
 
     struct MemberTypeInfo
     {

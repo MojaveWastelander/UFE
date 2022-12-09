@@ -27,7 +27,7 @@
     <ClInclude Include="UFE.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="UFile.hpp">
+    <ClInclude Include="FileWriter.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Records.hpp">
@@ -36,15 +36,21 @@
     <ClInclude Include="IndexedData.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="BinaryFileParser.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="UFE.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UFile.cpp">
+    <ClCompile Include="FileWriter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Records.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BinaryFileParser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
