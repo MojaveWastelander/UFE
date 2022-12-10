@@ -23,6 +23,8 @@ class BinaryFileParser
 public:
     bool open(fs::path file_path);
     void close() { return m_file.close(); }
+    size_t offset() { return m_file.tellg(); }
+
     bool export_json(fs::path json_path);
 
     const std::any& get_record(int32_t id);

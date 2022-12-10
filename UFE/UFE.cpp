@@ -65,7 +65,7 @@ int main(int arg, char** argv)
 { 
 	std::filesystem::path item_path = argv[1];
 	std::filesystem::path json_path = argv[1];
-	std::filesystem::path item_path2 = R"(M:\Games\SteamLibrary\steamapps\common\Underrail\data\rules_2\items\armor\biohazardsuit)";
+	std::filesystem::path item_path2 = R"(m:\Games\SteamLibrary\steamapps\common\Underrail\data\rules_2\characters\cavehopper)";
 
 	spdlog::set_level(spdlog::level::debug);
 
@@ -79,8 +79,8 @@ int main(int arg, char** argv)
 			reader.export_json(json_path);
 		}
 	}
-	//FileWriter writer;
-	//writer.update_file(item_path2, json_path);
+	FileWriter writer;
+	writer.update_file(item_path2, json_path);
 //	
 //	register_any_visitor<ufe::SerializationHeaderRecord>([](const ufe::SerializationHeaderRecord& head)
 //		{

@@ -27,28 +27,36 @@ class FileWriter
 public:
     bool update_file(fs::path& binary_file, fs::path& json_file);
 private:
-    bool read_record(nlohmann::ordered_json& obj);
+    bool json_elem(const nlohmann::ordered_json& json, const std::string& name)
+    {
+        static nlohmann::ordered_json dummy;
+        if (json.contains(name))
+        {
+            return true;
+        }
+        spdlog::warn("current json object doesn't contain element {}", name);
+        spdlog::debug(json.dump());
+        return false;
+    }
+
+    bool read_record(const nlohmann::ordered_json& obj);
     void get_raw_data();
     bool read(ufe::MemberTypeInfo& mti);
-    bool read(ufe::ClassWithMembersAndTypes& cmt, nlohmann::ordered_json& obj);
-    bool read(ufe::ClassWithId& cmt, nlohmann::ordered_json& obj);
+    bool read(ufe::ClassWithMembersAndTypes& cmt, const nlohmann::ordered_json& obj);
+    bool read(ufe::ClassWithId& cmt, const nlohmann::ordered_json& obj);
     bool read(ufe::ClassTypeInfo& cti);
     bool read(ufe::BinaryObjectString& bos);
 
-    void update_members_data(ufe::MemberTypeInfo& mti, ufe::ClassInfo& ci, nlohmann::ordered_json& obj);
-    nlohmann::ordered_json& find_class_members(std::string name, nlohmann::ordered_json& obj, int ref_id = 0);
+    void update_members_data(ufe::MemberTypeInfo& mti, ufe::ClassInfo& ci, const nlohmann::ordered_json& obj);
+    const nlohmann::ordered_json& find_class_members(std::string name, const nlohmann::ordered_json& obj, int ref_id = 0);
     template <typename T>
-    void process_member(nlohmann::ordered_json& obj, const std::string& name)
+    void process_member(const nlohmann::ordered_json& obj, const std::string& name)
     {
         IndexedData<T> tmp;
         m_parser.read(tmp);
         try
         {
-            if (!obj.contains(name))
-            {
-                spdlog::error("Member '{}' doesn't exists in current context:  {}", name, obj.dump());
-            }
-            else
+            if (json_elem(obj, name))
             {
                 T jtmp = obj[name].get<T>();
                 memcpy(reinterpret_cast<void*>(&m_raw_data[tmp.m_offset]), reinterpret_cast<void*>(&jtmp), sizeof(T));
@@ -68,7 +76,8 @@ private:
     BinaryFileParser m_parser;
     std::vector <IndexedData<ufe::LengthPrefixedString>> m_updated_strings;
     std::vector<char> m_raw_data;
-    nlohmann::ordered_json m_export;
+    nlohmann::ordered_json m_json;
+    nlohmann::ordered_json m_empty;
 };
 
 

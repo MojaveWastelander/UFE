@@ -50,9 +50,9 @@ void BinaryFileParser::read_records()
 {
     for (AnyJson a = read_record(); a.dyn_obj.has_value(); a = read_record())
     {
-        //spdlog::debug(a.json_obj.dump());
         if (!a.json_obj.empty())
         {
+            spdlog::debug(a.json_obj.dump());
             m_json["records"].push_back(a.json_obj.front());
         }
     }
@@ -60,7 +60,7 @@ void BinaryFileParser::read_records()
 
 AnyJson BinaryFileParser::read_record()
 {
-    nlohmann::ordered_json record_json;
+    nlohmann::ordered_json record_json = {};
     ufe::ERecordType rec = get_record_type();
     spdlog::info("Parsing record type: {}", ufe::ERecordType2str(rec));
     switch (rec)
@@ -129,7 +129,15 @@ AnyJson BinaryFileParser::read_record()
                         break;
                     case ufe::EBinaryTypeEnumeration::Class:
                     {
-                        record_json.push_back(read_record().json_obj);
+                        auto tmp = read_record().json_obj;
+                        if (!tmp.is_array())
+                        {
+                            record_json.push_back(tmp);
+                        }
+                        else
+                        {
+                            record_json.push_back(tmp.front());
+                        }
                     } break;
                     case ufe::EBinaryTypeEnumeration::ObjectArray:
                         break;
@@ -153,19 +161,13 @@ AnyJson BinaryFileParser::read_record()
             ufe::MemberReference ref;
             read(ref);
             spdlog::debug("reference id: {}", ref.m_idRef);
-            try
-            {
-                record_json["reference"] = ref.m_idRef;
-            }
-            catch (std::exception& e)
-            {
-                spdlog::error("Reference parse error: {}", e.what());
-                spdlog::trace(record_json.dump());
-            }
+            record_json["reference"] = ref.m_idRef;
             return { std::move(ref), record_json };
         } break;
         case ufe::ERecordType::ObjectNull:
         {
+            record_json = "ObjectNull";
+            return { std::any{1}, record_json };
         } break;
         case ufe::ERecordType::MessageEnd:
             break;
@@ -535,6 +537,7 @@ void BinaryFileParser::read_members_data(ufe::MemberTypeInfo& mti, ufe::ClassInf
 
     for (auto type : mti.BinaryTypeEnums)
     {
+        bool b = it_member_names->m_data.m_str == "E4:AO";
         switch (type)
         {
             case ufe::EBinaryTypeEnumeration::Primitive:
@@ -656,16 +659,24 @@ void BinaryFileParser::read_members_data(ufe::MemberTypeInfo& mti, ufe::ClassInf
                 mti.Data.push_back(nested_data.dyn_obj);
                 // read_record adds new record in json as array, this will add it as object for nested classes
                 // and in case of not null objects
-                if (!tmp.empty())
+                if (!nested_data.json_obj.empty())
                 {
-                    if (nested_data.dyn_obj.type() == typeid(ufe::ClassWithMembersAndTypes) || nested_data.dyn_obj.type() == typeid(ufe::ClassWithId))
+                    //if (nested_data.dyn_obj.type() == typeid(ufe::ClassWithMembersAndTypes) || nested_data.dyn_obj.type() == typeid(ufe::ClassWithId))
+                    //{
+                    //    obj[it_member_names->m_data.m_str] = tmp.front();
+                    //}
+                    //else
+                    //{
+                    //    // assing whole data
+                    //    obj[it_member_names->m_data.m_str] = tmp;
+                    //}
+                    if (nested_data.json_obj.is_array())
                     {
-                        obj[it_member_names->m_data.m_str] = tmp.front();
+                        obj[it_member_names->m_data.m_str] = nested_data.json_obj.front();
                     }
                     else
                     {
-                        // assing whole data
-                        obj[it_member_names->m_data.m_str] = tmp;
+                        obj[it_member_names->m_data.m_str] = nested_data.json_obj;
                     }
                     spdlog::debug(obj[it_member_names->m_data.m_str].dump());
                 }
