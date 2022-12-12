@@ -12,8 +12,10 @@
 #include <iostream>
 #include <string_view>
 #include "IndexedData.hpp"
+#include <nlohmann/json.hpp>
 
 
+using ojson = nlohmann::ordered_json;
 // json uses double internally and float->double casts are imprecise
 // thus corverting via strings
 double float2str2double(float f);

@@ -19,7 +19,7 @@ class JsonWriter
 {
 public:
     JsonWriter();
-    bool save(std::filesystem::path json_path, const std::vector<std::pair<int32_t, std::any>>& records);
+    bool save(std::filesystem::path json_path, const std::vector<std::any>& records);
 private:
 
     template<class T, class F>
@@ -27,34 +27,46 @@ private:
     {
         std::cout << "Register visitor for type "
             << std::quoted(typeid(T).name()) << '\n';
-        m_any_visitor.insert(std::make_pair(
-            std::type_index(typeid(T)),
-            [this, g = f](std::any const& a)
+        //m_any_visitor.insert(std::make_pair(
+        //    std::type_index(typeid(T)),
+        //    [this, &f](std::any const& a)
+        //    {
+        //        // return g(std::any_cast<T const&>(a));
+        //        return std::bind(f, this, std::any_cast<T const&>(a));
+        //    }
+        //));
+        m_any_visitor[std::type_index(typeid(T))] = [this, f](std::any const& a) -> nlohmann::ordered_json {
+            if (std::is_fundamental_v<T>)
             {
-                return g(std::any_cast<T const&>(a));
+                return std::bind(f, this, std::any_cast<T>(a))();
             }
-        ));
+            else
+            {
+                return std::bind(f, this, std::cref(std::any_cast<T const&>(a)))();
+            }
+        };
     }
 
-    bool process_records(const std::vector<std::pair<int32_t, std::any>>& records);
+    bool process_records(const std::vector<std::any>& records);
 
-    nlohmann::ordered_json class_with_members_and_types(const ufe::ClassWithMembersAndTypes& cmt)
-    {
-        nlohmann::ordered_json cls = { {"class", {}} };
+    nlohmann::ordered_json class_with_members_and_types(const ufe::ClassWithMembersAndTypes& cmt);
 
-        cls["class"]["name"] = cmt.m_ClassInfo.Name.m_data.m_str;
-        cls["class"]["id"] = cmt.m_ClassInfo.ObjectId.m_data;
-        cls["class"]["members"] = {};
-        auto& members = cls["class"]["members"];
-        spdlog::debug("process class {} with id {}", cmt.m_ClassInfo.Name.m_data.m_str, cmt.m_ClassInfo.ObjectId.m_data);
-        auto it_member_names = cmt.m_ClassInfo.MemberNames.cbegin();
-        for (const auto& data : cmt.m_MemberTypeInfo.Data)
-        {
-            members[it_member_names->m_data.m_str] = process(data);
-            spdlog::trace("'{}' : {}", it_member_names->m_data.m_str, members[it_member_names->m_data.m_str].dump());
-        }
-        return cls;
-    }
+    void process_class_members(nlohmann::ordered_json& members, const  ufe::ClassInfo& ci, const  ufe::MemberTypeInfo& mti);
+
+    ojson member_reference(const ufe::MemberReference& mref);
+    ojson binary_object_string(const ufe::BinaryObjectString& bos);
+    ojson class_with_id(const ufe::ClassWithId& cwi);
+    ojson value_char(char x) { return ojson(x); }
+    ojson value_uchar(unsigned char x) { return ojson(x); }
+    ojson value_bool(bool x) { return ojson(x); }
+    ojson value_int32(int32_t x) { return ojson(x); }
+    ojson value_uint32(uint32_t x) { return ojson(x); }
+    ojson value_int16(int16_t x) { return ojson(x); }
+    ojson value_uint16(uint16_t x) { return ojson(x); }
+    ojson value_int64(int64_t x) { return ojson(x); }
+    ojson value_uint64(uint64_t x) { return ojson(x); }
+    ojson value_float(float x) { return ojson(float2str2double(x)); }
+    ojson value_double(double x) { return ojson(x); }
     static std::unordered_map<
         std::type_index, std::function<nlohmann::ordered_json(std::any const&)>>
         m_any_visitor;

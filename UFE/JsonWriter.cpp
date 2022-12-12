@@ -11,28 +11,107 @@ JsonWriter::JsonWriter()
     if (m_any_visitor.empty())
     {
        //register_any_visitor<ufe::ClassWithMembersAndTypes>( &JsonWriter::class_with_members_and_types);
-        m_any_visitor.insert(std::make_pair(std::type_index(typeid(ufe::ClassWithMembersAndTypes)),
-            [this](const std::any& a)
-            {
-                return this->class_with_members_and_types(std::any_cast<ufe::ClassWithMembersAndTypes>(a));
-            })
-        );
+        //m_any_visitor.insert(std::make_pair(std::type_index(typeid(ufe::ClassWithMembersAndTypes)),
+        //    [this](const std::any& a)
+        //    {
+        //        return this->class_with_members_and_types(std::any_cast<ufe::ClassWithMembersAndTypes>(a));
+        //    })
+        //);
+        register_any_visitor<ufe::ClassWithMembersAndTypes>(&JsonWriter::class_with_members_and_types);
+        register_any_visitor<ufe::ClassWithId>(&JsonWriter::class_with_id);
+        register_any_visitor<ufe::MemberReference>(&JsonWriter::member_reference);
+        register_any_visitor<ufe::BinaryObjectString>(&JsonWriter::binary_object_string);
+        register_any_visitor<bool>(&JsonWriter::value_bool);
+        register_any_visitor<char>(&JsonWriter::value_char);
+        register_any_visitor<unsigned char>(&JsonWriter::value_uchar);
+        register_any_visitor<int16_t>(&JsonWriter::value_int16);
+        register_any_visitor<uint16_t>(&JsonWriter::value_uint16);
+        register_any_visitor<int32_t>(&JsonWriter::value_int32);
+        register_any_visitor<uint32_t>(&JsonWriter::value_uint32);
+        register_any_visitor<int64_t>(&JsonWriter::value_int64);
+        register_any_visitor<uint64_t>(&JsonWriter::value_uint64);
+        register_any_visitor<float>(&JsonWriter::value_float);
+        register_any_visitor<double>(&JsonWriter::value_double);
+        //register_any_visitor<>(&JsonWriter::);
     }
-}
-
-bool JsonWriter::save(std::filesystem::path json_path, const std::vector<std::pair<int32_t, std::any>>& records)
-{
-    process_records(records);
-    return false;
-}
-
-bool JsonWriter::process_records(const std::vector<std::pair<int32_t, std::any>>& records)
-{
-    for (const auto& [id , rec] : records)
+    // init json
+    m_json =
     {
-        m_json.push_back(process(rec));
+        {
+            "records", {}
+        }
+    };
+}
+
+bool JsonWriter::save(std::filesystem::path json_path, const std::vector<std::any>& records)
+{
+    std::ofstream out_json{ json_path };
+    if (out_json)
+    {
+        process_records(records);
+        out_json << std::setw(4) << m_json;
+        return true;
+    }
+
+    return false;
+}
+
+bool JsonWriter::process_records(const std::vector<std::any>& records)
+{
+    auto& json_records = m_json["records"];
+    for (const auto& rec : records)
+    {
+        auto json = process(rec);
+        if (!json.empty())
+        {
+            json_records.push_back(json);
+        }
     }
     return false;
+}
+
+nlohmann::ordered_json JsonWriter::class_with_members_and_types(const ufe::ClassWithMembersAndTypes& cmt)
+{
+    nlohmann::ordered_json cls = { {"class", {}} };
+    cls["class"]["name"] = cmt.m_ClassInfo.Name.m_data.m_str;
+    cls["class"]["id"] = cmt.m_ClassInfo.ObjectId.m_data;
+    cls["class"]["members"] = {};
+    spdlog::debug("process class {} with id {}", cmt.m_ClassInfo.Name.m_data.m_str, cmt.m_ClassInfo.ObjectId.m_data);
+    process_class_members(cls["class"]["members"], cmt.m_ClassInfo, cmt.m_MemberTypeInfo);
+    return cls;
+}
+
+void JsonWriter::process_class_members(nlohmann::ordered_json& members, const ufe::ClassInfo& ci, const ufe::MemberTypeInfo& mti)
+{
+    auto it_member_names = ci.MemberNames.cbegin();
+    for (const auto& data : mti.Data)
+    {
+        members[it_member_names->m_data.m_str] = process(data);
+        spdlog::debug("'{}' : {}", it_member_names->m_data.m_str, members[it_member_names->m_data.m_str].dump());
+        ++it_member_names;
+    }
+}
+
+ojson JsonWriter::member_reference(const ufe::MemberReference& mref)
+{
+    return ojson{ {"reference", mref.m_idRef} };
+}
+
+ojson JsonWriter::binary_object_string(const ufe::BinaryObjectString& bos)
+{
+    return ojson(bos.m_Value.m_data.m_str);
+}
+
+ojson JsonWriter::class_with_id(const ufe::ClassWithId& cwi)
+{
+    nlohmann::ordered_json cls = { {"class_id", {}} };
+    cls["class_id"]["name"] = cwi.m_ClassInfo.Name.m_data.m_str;
+    cls["class_id"]["id"] = cwi.m_ClassInfo.ObjectId.m_data;
+    cls["class_id"]["ref_id"] = cwi.MetadataId.m_data;
+    cls["class_id"]["members"] = {};
+    spdlog::debug("process class_id {} with id {}", cwi.m_ClassInfo.Name.m_data.m_str, cwi.m_ClassInfo.ObjectId.m_data);
+    process_class_members(cls["class_id"]["members"], cwi.m_ClassInfo, cwi.m_MemberTypeInfo);
+    return cls;
 }
 
 std::unordered_map<
@@ -47,5 +126,5 @@ nlohmann::ordered_json JsonWriter::process(const std::any& a)
     else {
         spdlog::error("Unregistered type: {}", a.type().name());
     }
-    return nlohmann::ordered_json{};
+    return nlohmann::ordered_json(nullptr);
 }

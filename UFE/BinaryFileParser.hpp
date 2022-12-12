@@ -25,7 +25,7 @@ public:
     void close() { return m_file.close(); }
     size_t offset() { return m_file.tellg(); }
 
-    const std::vector<std::pair<int32_t, std::any>>& get_records() const noexcept { return m_records; }
+    const std::vector<std::any>& get_records() const noexcept { return m_root_records; }
 
     bool export_json(fs::path json_path);
 
@@ -112,6 +112,7 @@ public:
 
 private:
     std::vector<std::pair<int32_t, std::any>> m_records;
+    std::vector<std::any> m_root_records;
     std::fstream m_file;
     fs::path m_file_path;
     nlohmann::ordered_json m_json;

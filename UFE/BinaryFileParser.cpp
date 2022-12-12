@@ -52,8 +52,9 @@ void BinaryFileParser::read_records()
     {
         if (!a.json_obj.empty())
         {
-            spdlog::debug(a.json_obj.dump());
-            m_json["records"].push_back(a.json_obj.front());
+            m_root_records.push_back(a.dyn_obj);
+            //spdlog::debug(a.json_obj.dump());
+            //m_json["records"].push_back(a.json_obj.front());
         }
     }
 }
@@ -431,6 +432,8 @@ bool BinaryFileParser::read(ufe::ClassWithId& cmt, nlohmann::ordered_json& obj)
         const auto& ref = std::any_cast<const ufe::ClassWithMembersAndTypes&>(ref_class);
         cmt.m_ClassInfo = ref.m_ClassInfo;
         cmt.m_MemberTypeInfo = ref.m_MemberTypeInfo;
+        // clear data from copied reference
+        cmt.m_MemberTypeInfo.Data.clear();
         cmt.m_ClassInfo.ObjectId = obj_id;
         cls["class_id"]["name"] = cmt.m_ClassInfo.Name.m_data.m_str;
         cls["class_id"]["id"] = cmt.m_ClassInfo.ObjectId.m_data;
