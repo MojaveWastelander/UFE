@@ -25,6 +25,8 @@ public:
     void close() { return m_file.close(); }
     size_t offset() { return m_file.tellg(); }
 
+    const std::vector<std::pair<int32_t, std::any>>& get_records() const noexcept { return m_records; }
+
     bool export_json(fs::path json_path);
 
     const std::any& get_record(int32_t id);

@@ -13,6 +13,7 @@
 #include <spdlog/spdlog.h>
 #include "FileWriter.hpp"
 #include "BinaryFileParser.hpp"
+#include "JsonWriter.hpp"
 
 //int xmain()
 //{
@@ -76,11 +77,14 @@ int main(int arg, char** argv)
 		{
 			reader.read_records();
 
-			reader.export_json(json_path);
+			//reader.export_json(json_path);
 		}
+        JsonWriter writer;
+        writer.save(json_path, reader.get_records());
 	}
-	FileWriter writer;
-	writer.update_file(item_path2, json_path);
+
+	//FileWriter writer;
+	//writer.update_file(item_path2, json_path);
 //	
 //	register_any_visitor<ufe::SerializationHeaderRecord>([](const ufe::SerializationHeaderRecord& head)
 //		{
