@@ -189,7 +189,7 @@ AnyJson BinaryFileParser::read_record()
         case ufe::ERecordType::ObjectNull:
         {
             record_json = "ObjectNull";
-            return { std::any{1}, record_json };
+            return { std::any{ufe::ObjectNull{}}, record_json };
         } break;
         case ufe::ERecordType::MessageEnd:
         {
@@ -732,7 +732,7 @@ void BinaryFileParser::read_members_data(ufe::MemberTypeInfo& mti, ufe::ClassInf
     }
 }
 
-std::vector<char> BinaryFileParser::raw_data()
+std::vector<char> BinaryFileParser::raw_data() const
 {
     std::vector<char> tmp;
     auto curr_offset = m_file.tellg();

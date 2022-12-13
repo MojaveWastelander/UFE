@@ -15,6 +15,7 @@
 #include "FileWriter.hpp"
 #include "BinaryFileParser.hpp"
 #include "JsonWriter.hpp"
+#include "JsonReader.hpp"
 
 //int xmain()
 //{
@@ -69,7 +70,7 @@ int main(int arg, char** argv)
 	std::filesystem::path json_path = item_path ;//= argv[1];
 	std::filesystem::path item_path2 = item_path;
     auto new_logger = spdlog::basic_logger_mt("default_logger", "logs/ufe.log", true);
-    spdlog::set_default_logger(new_logger);
+    //spdlog::set_default_logger(new_logger);
 	spdlog::set_level(spdlog::level::debug);
 
 	for (const auto& p : fs::recursive_directory_iterator{item_path})
@@ -77,21 +78,25 @@ int main(int arg, char** argv)
         std::filesystem::path json_path = p;//= argv[1];
         json_path += ".json";
         {
-            BinaryFileParser reader;
-            if (reader.open(p))
+            BinaryFileParser parser;
+            if (parser.open(p))
             {
-                reader.read_records();
+                parser.read_records();
 
-                if (reader.status() != BinaryFileParser::EFileStatus::Invalid &&
-                    reader.status() != BinaryFileParser::EFileStatus::Empty)
+                if (parser.status() != BinaryFileParser::EFileStatus::Invalid &&
+                    parser.status() != BinaryFileParser::EFileStatus::Empty)
                 {
 	                //reader.export_json(json_path);
-                    if (reader.status() == BinaryFileParser::EFileStatus::PartialRead)
+                    if (parser.status() == BinaryFileParser::EFileStatus::PartialRead)
                     {
                         spdlog::error("Partial file read!!!!");
+                        continue;
                     }
-	                JsonWriter writer;
-	                writer.save(json_path, reader.get_records());
+	                //JsonWriter writer;
+	                //writer.save(json_path, parser.get_records());
+                    JsonReader reader;
+                    reader.patch(json_path, p, parser);
+                    break;
                 }
             }
         }

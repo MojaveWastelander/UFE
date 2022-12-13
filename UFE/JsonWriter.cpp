@@ -25,17 +25,17 @@ JsonWriter::JsonWriter()
         register_any_visitor<ufe::BinaryArray>(&JsonWriter::array_binary);
         register_any_visitor<ufe::ObjectNull>(&JsonWriter::object_null);
         register_any_visitor<ufe::ObjectNullMultiple256>(&JsonWriter::object_null_256);
-        register_any_visitor<bool>(&JsonWriter::value_bool);
-        register_any_visitor<char>(&JsonWriter::value_char);
-        register_any_visitor<unsigned char>(&JsonWriter::value_uchar);
-        register_any_visitor<int16_t>(&JsonWriter::value_int16);
-        register_any_visitor<uint16_t>(&JsonWriter::value_uint16);
-        register_any_visitor<int32_t>(&JsonWriter::value_int32);
-        register_any_visitor<uint32_t>(&JsonWriter::value_uint32);
-        register_any_visitor<int64_t>(&JsonWriter::value_int64);
-        register_any_visitor<uint64_t>(&JsonWriter::value_uint64);
-        register_any_visitor<float>(&JsonWriter::value_float);
-        register_any_visitor<double>(&JsonWriter::value_double);
+        register_any_visitor<IndexedData<bool>>(&JsonWriter::value_bool);
+        register_any_visitor<IndexedData<char>>(&JsonWriter::value_char);
+        register_any_visitor<IndexedData<unsigned char>>(&JsonWriter::value_uchar);
+        register_any_visitor<IndexedData<int16_t>>(&JsonWriter::value_int16);
+        register_any_visitor<IndexedData<uint16_t>>(&JsonWriter::value_uint16);
+        register_any_visitor<IndexedData<int32_t>>(&JsonWriter::value_int32);
+        register_any_visitor<IndexedData<uint32_t>>(&JsonWriter::value_uint32);
+        register_any_visitor<IndexedData<int64_t>>(&JsonWriter::value_int64);
+        register_any_visitor<IndexedData<uint64_t>>(&JsonWriter::value_uint64);
+        register_any_visitor<IndexedData<float>>(&JsonWriter::value_float);
+        register_any_visitor<IndexedData<double>>(&JsonWriter::value_double);
         //register_any_visitor<>(&JsonWriter::);
     }
     // init json

@@ -103,26 +103,26 @@ public:
     template <typename T>
     void read_primitive(nlohmann::ordered_json& obj)
     {
-        T tmp;
-        tmp = read<T>();
-        obj.push_back(tmp);
+        IndexedData<T> tmp;
+        read(tmp);
+        obj.push_back(tmp.m_data);
     }
 
     template <typename T>
     void process_member(nlohmann::ordered_json& obj, std::vector<IndexedData<ufe::LengthPrefixedString>>::const_iterator it_member_names, ufe::MemberTypeInfo& mti)
     {
-        T tmp = read<T>();
-        obj[it_member_names->m_data.m_str] = tmp;
-        spdlog::debug("\t{} = {}", it_member_names->m_data.m_str, tmp);
+        IndexedData<T> tmp;
+        read(tmp);
+        spdlog::debug("\t{} = {}", it_member_names->m_data.m_str, tmp.m_data);
         mti.Data.push_back(std::any{ tmp });
     }
-    std::vector<char> raw_data();
+    std::vector<char> raw_data() const;
 
 private:
     bool check_header(const ufe::SerializationHeaderRecord& header);
     std::vector<std::pair<int32_t, std::any>> m_records;
     std::vector<std::any> m_root_records;
-    std::fstream m_file;
+    mutable std::fstream m_file;
     fs::path m_file_path;
     EFileStatus m_status = EFileStatus::Empty;
     nlohmann::ordered_json m_json;

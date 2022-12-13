@@ -1,1 +1,182 @@
 #include "JsonReader.hpp"
+JsonReader::JsonReader()
+{
+    // assign all callbacks
+    if (m_any_visitor.empty())
+    {
+        //register_any_visitor<ufe::ClassWithMembersAndTypes>( &JsonWriter::class_with_members_and_types);
+         //m_any_visitor.insert(std::make_pair(std::type_index(typeid(ufe::ClassWithMembersAndTypes)),
+         //    [this](const std::any& a)
+         //    {
+         //        return this->class_with_members_and_types(std::any_cast<ufe::ClassWithMembersAndTypes>(a));
+         //    })
+         //);
+        register_any_visitor<ufe::ClassWithMembersAndTypes>(&JsonReader::class_with_members_and_types);
+        register_any_visitor<ufe::ClassWithId>(&JsonReader::class_with_id);
+        register_any_visitor<ufe::MemberReference>(&JsonReader::member_reference);
+        register_any_visitor<ufe::BinaryObjectString>(&JsonReader::binary_object_string);
+        register_any_visitor<ufe::ObjectNull>(&JsonReader::object_null);
+        register_any_visitor<IndexedData<bool>>(&JsonReader::value_bool);
+        register_any_visitor<IndexedData<char>>(&JsonReader::value_char);
+        register_any_visitor<IndexedData<unsigned char>>(&JsonReader::value_uchar);
+        register_any_visitor<IndexedData<int16_t>>(&JsonReader::value_int16);
+        register_any_visitor<IndexedData<uint16_t>>(&JsonReader::value_uint16);
+        register_any_visitor<IndexedData<int32_t>>(&JsonReader::value_int32);
+        register_any_visitor<IndexedData<uint32_t>>(&JsonReader::value_uint32);
+        register_any_visitor<IndexedData<int64_t>>(&JsonReader::value_int64);
+        register_any_visitor<IndexedData<uint64_t>>(&JsonReader::value_uint64);
+        register_any_visitor<IndexedData<float>>(&JsonReader::value_float);
+        register_any_visitor<IndexedData<double>>(&JsonReader::value_double);
+        //register_any_visitor<>(&JsonReader::);
+    }
+    // init json
+    m_json =
+    {
+        {
+            "records", {}
+        }
+    };
+}
+
+bool JsonReader::patch(std::filesystem::path json_path, std::filesystem::path binary_path, const BinaryFileParser& parser)
+{
+    if (std::filesystem::exists(json_path) && std::filesystem::is_regular_file(json_path))
+    {
+        if (std::filesystem::exists(binary_path) && std::filesystem::is_regular_file(binary_path))
+        {
+            m_raw_data = parser.raw_data();
+            std::ifstream json{ json_path };
+            spdlog::info("Patching file '{}'", binary_path.string());
+            try
+            {
+                json >> m_json;
+                process_records(parser.get_records());
+            }
+            catch (std::exception& e)
+            {
+                spdlog::critical("Failed to parse json file: {}", e.what());
+            }
+        }
+
+    }
+    return false;
+}
+
+std::unordered_map<
+    std::type_index, std::function<void(std::any const&, const ojson&)>> JsonReader::m_any_visitor;
+
+bool JsonReader::process_records(const std::vector<std::any>& records)
+{
+    const auto& json_records = m_json["records"];
+    for (const auto& rec : records)
+    {
+        process(rec, json_records);
+    }
+    return false;
+}
+
+void JsonReader::binary_object_string(const ufe::BinaryObjectString& bos, const ojson& ctx)
+{
+    if (ctx.contains("obj_string_id"))
+    {
+        std::string json_str = ctx["value"];
+        if (json_str != bos.m_Value.m_data.m_str)
+        {
+            spdlog::warn("orig_str: {}", bos.m_Value.m_data.m_str);
+            spdlog::warn("json_str: {}", json_str);
+        }
+    }
+}
+
+void JsonReader::class_with_members_and_types(const ufe::ClassWithMembersAndTypes& cmt, const ojson& ctx)
+{
+    const auto& cls = find_class_by_id(ctx, cmt.m_ClassInfo, "class");
+    if (!cls.is_null())
+    {
+        const auto& members = cls["members"];
+        auto it_member_names = cmt.m_ClassInfo.MemberNames.cbegin();
+        spdlog::debug("Processing class '{}' with id {}", cmt.m_ClassInfo.Name.m_data.m_str, cmt.m_ClassInfo.ObjectId.m_data);
+        spdlog::debug(cls.dump());
+        for (const auto& rec : cmt.m_MemberTypeInfo.Data)
+        {
+            
+            if (json_elem(members, it_member_names->m_data.m_str))
+            {
+                spdlog::debug(it_member_names->m_data.m_str);
+                process(rec, members[it_member_names->m_data.m_str]);
+            }
+            ++it_member_names;
+        }
+        spdlog::debug("Done class {}", cmt.m_ClassInfo.ObjectId.m_data);
+    }
+    else
+    {
+        spdlog::warn("Class '{}' with id {} not found", cmt.m_ClassInfo.Name.m_data.m_str, cmt.m_ClassInfo.ObjectId.m_data);
+    }
+}
+
+void JsonReader::class_with_id(const ufe::ClassWithId& cwi, const ojson& ctx)
+{
+    const auto& cls = find_class_by_id(ctx, cwi.m_ClassInfo, "class_id");
+    if (!cls.is_null())
+    {
+        const auto& members = cls["members"];
+        auto it_member_names = cwi.m_ClassInfo.MemberNames.cbegin();
+        spdlog::debug("Processing class_id '{}' with id {}", cwi.m_ClassInfo.Name.m_data.m_str, cwi.m_ClassInfo.ObjectId.m_data);
+        spdlog::debug(cls.dump());
+        for (const auto& rec : cwi.m_MemberTypeInfo.Data)
+        {
+
+            if (json_elem(members, it_member_names->m_data.m_str))
+            {
+                spdlog::debug(it_member_names->m_data.m_str);
+                process(rec, members[it_member_names->m_data.m_str]);
+            }
+            ++it_member_names;
+        }
+        spdlog::debug("Done class_id {}", cwi.m_ClassInfo.ObjectId.m_data);
+    }
+    else
+    {
+        spdlog::warn("Class '{}' with id {} not found", cwi.m_ClassInfo.Name.m_data.m_str, cwi.m_ClassInfo.ObjectId.m_data);
+    }
+}
+
+const ojson& JsonReader::find_class_by_id(const ojson& ctx, const ufe::ClassInfo& ci, std::string class_type)
+{
+    static ojson dummy(nullptr);
+    // root class or array element
+    if (ctx.is_array())
+    {
+        for (const auto& rec : ctx)
+        {
+            if (rec.contains(class_type))
+            {
+                auto id = rec[class_type]["id"].get<int32_t>();
+                if (id == ci.ObjectId.m_data)
+                {
+                    return rec[class_type];
+                }
+            }
+        }
+    }
+
+    // member value
+    if (ctx.is_object() && ctx.contains(class_type))
+    {
+        return ctx[class_type];
+    }
+
+    return dummy;
+}
+
+void JsonReader::process(const std::any& a, const ojson& context)
+{
+    if (const auto it = m_any_visitor.find(std::type_index(a.type()));
+        it != m_any_visitor.cend()) {
+        it->second(a, context);
+    }
+    else {
+        spdlog::error("Unregistered type: {}", a.type().name());
+    }
+}
