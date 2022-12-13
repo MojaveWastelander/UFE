@@ -424,13 +424,16 @@ bool BinaryFileParser::read(ufe::LengthPrefixedString& lps)
 {
     uint32_t len = 0;
     lps.m_original_len = 0;
+    lps.m_original_len_unmod = 0;
     for (int i = 0; i < 5; ++i)
     {
         uint8_t seg = read();
+        lps.m_original_len_unmod |= static_cast<uint64_t>(seg) << (8 * i);
         lps.m_original_len |= static_cast<uint64_t>(seg) << (8 * i);
         len |= static_cast<uint32_t>(seg & 0x7F) << (7 * i);
         if ((seg & 0x80) == 0x00) break;
     }
+    lps.m_original_len = len;
     lps.m_str.resize(len);
     m_file.read(lps.m_str.data(), len);
     return true;

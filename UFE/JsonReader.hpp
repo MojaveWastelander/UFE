@@ -75,6 +75,7 @@ private:
     }
 
     bool process_records(const std::vector<std::any>& records);
+    void update_strings();
 
 
     const ojson& find_class_by_id(const ojson& ctx, const ufe::ClassInfo& ci, std::string class_type);

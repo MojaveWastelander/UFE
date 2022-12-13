@@ -47,10 +47,19 @@ bool JsonReader::patch(std::filesystem::path json_path, std::filesystem::path bi
             m_raw_data = parser.raw_data();
             std::ifstream json{ json_path };
             spdlog::info("Patching file '{}'", binary_path.string());
+            spdlog::info("with json file '{}'", json_path.string());
             try
             {
                 json >> m_json;
                 process_records(parser.get_records());
+                update_strings();
+
+                parser.close();
+                std::ofstream bin{ binary_path, std::ios::binary };
+                if (bin)
+                {
+                    bin.write(m_raw_data.data(), m_raw_data.size());
+                }
             }
             catch (std::exception& e)
             {
@@ -75,6 +84,38 @@ bool JsonReader::process_records(const std::vector<std::any>& records)
     return false;
 }
 
+void JsonReader::update_strings()
+{
+    // update all strings in reverse order
+    std::for_each(m_updated_strings.rbegin(), m_updated_strings.rend(),
+        [this](IndexedData<ufe::LengthPrefixedString>& ref)
+        {
+            if (1)
+            {
+                std::string tmp;
+                tmp.reserve(ref.m_data.m_str.size() + 5);
+                auto len = ref.m_data.m_new_len;
+                for (; len; len >>= 8)
+                {
+                    tmp.push_back(static_cast<char>(len & 0xFF));
+                }
+                tmp.append(ref.m_data.m_str.cbegin(), ref.m_data.m_str.cend());
+
+                // erase old size
+                len = ref.m_data.m_original_len_unmod;
+                auto it = m_raw_data.begin();
+                for (; len; len >>= 8)
+                {
+                    it = m_raw_data.erase(m_raw_data.begin() + ref.m_offset);
+                }
+                // erase old string data
+                m_raw_data.erase(it, it + ref.m_data.m_original_len);
+
+                m_raw_data.insert(m_raw_data.cbegin() + ref.m_offset, tmp.cbegin(), tmp.cend());
+            }
+        });
+}
+
 void JsonReader::binary_object_string(const ufe::BinaryObjectString& bos, const ojson& ctx)
 {
     if (ctx.contains("obj_string_id"))
@@ -84,6 +125,9 @@ void JsonReader::binary_object_string(const ufe::BinaryObjectString& bos, const 
         {
             spdlog::warn("orig_str: {}", bos.m_Value.m_data.m_str);
             spdlog::warn("json_str: {}", json_str);
+            auto lps = bos.m_Value;
+            lps.m_data.update_string(json_str);
+            m_updated_strings.push_back(lps);
         }
     }
 }
@@ -96,7 +140,6 @@ void JsonReader::class_with_members_and_types(const ufe::ClassWithMembersAndType
         const auto& members = cls["members"];
         auto it_member_names = cmt.m_ClassInfo.MemberNames.cbegin();
         spdlog::debug("Processing class '{}' with id {}", cmt.m_ClassInfo.Name.m_data.m_str, cmt.m_ClassInfo.ObjectId.m_data);
-        spdlog::debug(cls.dump());
         for (const auto& rec : cmt.m_MemberTypeInfo.Data)
         {
             
@@ -123,7 +166,6 @@ void JsonReader::class_with_id(const ufe::ClassWithId& cwi, const ojson& ctx)
         const auto& members = cls["members"];
         auto it_member_names = cwi.m_ClassInfo.MemberNames.cbegin();
         spdlog::debug("Processing class_id '{}' with id {}", cwi.m_ClassInfo.Name.m_data.m_str, cwi.m_ClassInfo.ObjectId.m_data);
-        spdlog::debug(cls.dump());
         for (const auto& rec : cwi.m_MemberTypeInfo.Data)
         {
 

@@ -29,7 +29,7 @@ public:
         Invalid
     };
     bool open(fs::path file_path);
-    void close() { return m_file.close(); }
+    void close() const { return m_file.close(); }
     size_t offset() { return m_file.tellg(); }
     EFileStatus status() const noexcept { return m_status; }
 
