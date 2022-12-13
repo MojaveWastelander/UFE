@@ -21,6 +21,10 @@ JsonWriter::JsonWriter()
         register_any_visitor<ufe::ClassWithId>(&JsonWriter::class_with_id);
         register_any_visitor<ufe::MemberReference>(&JsonWriter::member_reference);
         register_any_visitor<ufe::BinaryObjectString>(&JsonWriter::binary_object_string);
+        register_any_visitor<ufe::ArraySingleString>(&JsonWriter::array_single_string);
+        register_any_visitor<ufe::BinaryArray>(&JsonWriter::array_binary);
+        register_any_visitor<ufe::ObjectNull>(&JsonWriter::object_null);
+        register_any_visitor<ufe::ObjectNullMultiple256>(&JsonWriter::object_null_256);
         register_any_visitor<bool>(&JsonWriter::value_bool);
         register_any_visitor<char>(&JsonWriter::value_char);
         register_any_visitor<unsigned char>(&JsonWriter::value_uchar);
@@ -49,10 +53,11 @@ bool JsonWriter::save(std::filesystem::path json_path, const std::vector<std::an
     if (out_json)
     {
         process_records(records);
+        spdlog::info("Exporting data to '{}'", json_path.string());
         out_json << std::setw(4) << m_json;
         return true;
     }
-
+    spdlog::error("Could not save '{}'", json_path.string());
     return false;
 }
 
@@ -99,7 +104,11 @@ ojson JsonWriter::member_reference(const ufe::MemberReference& mref)
 
 ojson JsonWriter::binary_object_string(const ufe::BinaryObjectString& bos)
 {
-    return ojson(bos.m_Value.m_data.m_str);
+    // return ojson(bos.m_Value.m_data.m_str);
+    ojson str = nlohmann::ordered_json::value_t::object;
+    str["obj_string_id"] = bos.m_ObjectId;
+    str["value"] = bos.m_Value.m_data.m_str;
+    return str;
 }
 
 ojson JsonWriter::class_with_id(const ufe::ClassWithId& cwi)
@@ -112,6 +121,37 @@ ojson JsonWriter::class_with_id(const ufe::ClassWithId& cwi)
     spdlog::debug("process class_id {} with id {}", cwi.m_ClassInfo.Name.m_data.m_str, cwi.m_ClassInfo.ObjectId.m_data);
     process_class_members(cls["class_id"]["members"], cwi.m_ClassInfo, cwi.m_MemberTypeInfo);
     return cls;
+}
+
+ojson JsonWriter::array_single_string(const ufe::ArraySingleString& arr)
+{
+    ojson str = nlohmann::ordered_json::value_t::object;
+    str["array_id"] = arr.ObjectId;
+    str["values"] = {};
+    for (const auto& rec : arr.Data)
+    {
+        str["values"].push_back(process(rec));
+    }
+    return str;
+}
+
+ojson JsonWriter::array_binary(const ufe::BinaryArray& arr)
+{
+    ojson str = nlohmann::ordered_json::value_t::object;
+    str["array_id"] = arr.ObjectId;
+    str["values"] = {};
+    for (const auto& rec : arr.Data)
+    {
+        str["values"].push_back(process(rec));
+    }
+    return str;
+}
+
+ojson JsonWriter::object_null_256(ufe::ObjectNullMultiple256 obj)
+{
+    ojson str = nlohmann::ordered_json::value_t::object;
+    str["null_packed"] = obj.NullCount;
+    return str;
 }
 
 std::unordered_map<

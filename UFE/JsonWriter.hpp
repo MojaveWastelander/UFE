@@ -25,8 +25,8 @@ private:
     template<class T, class F>
     inline void register_any_visitor(F const& f)
     {
-        std::cout << "Register visitor for type "
-            << std::quoted(typeid(T).name()) << '\n';
+        //std::cout << "Register visitor for type "
+        //    << std::quoted(typeid(T).name()) << '\n';
         //m_any_visitor.insert(std::make_pair(
         //    std::type_index(typeid(T)),
         //    [this, &f](std::any const& a)
@@ -56,6 +56,8 @@ private:
     ojson member_reference(const ufe::MemberReference& mref);
     ojson binary_object_string(const ufe::BinaryObjectString& bos);
     ojson class_with_id(const ufe::ClassWithId& cwi);
+    ojson array_single_string(const ufe::ArraySingleString& arr);
+    ojson array_binary(const ufe::BinaryArray& arr);
     ojson value_char(char x) { return ojson(x); }
     ojson value_uchar(unsigned char x) { return ojson(x); }
     ojson value_bool(bool x) { return ojson(x); }
@@ -67,6 +69,9 @@ private:
     ojson value_uint64(uint64_t x) { return ojson(x); }
     ojson value_float(float x) { return ojson(float2str2double(x)); }
     ojson value_double(double x) { return ojson(x); }
+    ojson value_void(void) { return ojson(nullptr); }
+    ojson object_null(ufe::ObjectNull) { return ojson(nullptr); }
+    ojson object_null_256(ufe::ObjectNullMultiple256 obj);
     static std::unordered_map<
         std::type_index, std::function<nlohmann::ordered_json(std::any const&)>>
         m_any_visitor;

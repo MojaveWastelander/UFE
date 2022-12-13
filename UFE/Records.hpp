@@ -171,6 +171,7 @@ namespace ufe
 
     struct ObjectNullMultiple256
     {
+        uint8_t NullCount;
     };
     struct ClassWithMembersAndTypes;
     using AdditionalInfosType = std::variant<EPrimitiveTypeEnumeration, LengthPrefixedString, ClassTypeInfo>;
@@ -185,6 +186,7 @@ namespace ufe
         std::vector<int32_t> LowerBounds;
         EBinaryTypeEnumeration TypeEnum;
         AdditionalInfosType AdditionalTypeInfo;
+        std::vector<std::any> Data;
     };
 
     struct ArraySingleString

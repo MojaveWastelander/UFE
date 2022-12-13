@@ -3,24 +3,30 @@
 
 bool BinaryFileParser::open(fs::path file_path)
 {
-    if (fs::exists(file_path) && fs::is_regular_file(file_path))
+    if (fs::exists(file_path))
     {
-        std::cout << "Reading file: " << file_path << '\n';
-        m_file.open(file_path, std::ios::binary | std::ios::in | std::ios::out);
-        m_file_path = file_path;
-        // init json
-        m_json =
+        if (fs::is_regular_file(file_path))
         {
-            {
-                "records", {}
-            }
-        };
-
-        return true;
+	        spdlog::info("Reading file: {} ", file_path.string());
+	        m_file.open(file_path, std::ios::binary | std::ios::in | std::ios::out);
+	        if (m_file)
+	        {
+	            m_file_path = file_path;
+	            // init json
+	            m_json =
+	            {
+	                {
+	                    "records", {}
+	                }
+	            };
+	            return true;
+	        }
+	        spdlog::error("Could not open file for reading");
+        }
     }
     else
     {
-        spdlog::error("Failed to open '{}'", file_path.string());
+        spdlog::warn("File '{}' doesn't exist", file_path.string());
     }
     return false;
 }
@@ -46,6 +52,20 @@ const std::any& BinaryFileParser::get_record(int32_t id)
     return dummy;
 }
 
+
+bool BinaryFileParser::check_header(const ufe::SerializationHeaderRecord& header)
+{
+    if (header.RootId.m_data != 1 &&
+        header.HeaderId.m_data != -1 &&
+        header.MajorVersion.m_data != 1 &&
+        header.MinorVersion.m_data != 0)
+    {
+        spdlog::warn("Header doesn't match, abort reading file");
+        return false;
+    }
+    return true;
+}
+
 void BinaryFileParser::read_records()
 {
     for (AnyJson a = read_record(); a.dyn_obj.has_value(); a = read_record())
@@ -63,13 +83,20 @@ AnyJson BinaryFileParser::read_record()
 {
     nlohmann::ordered_json record_json = {};
     ufe::ERecordType rec = get_record_type();
-    spdlog::info("Parsing record type: {}", ufe::ERecordType2str(rec));
+    spdlog::debug("Parsing record type: {}", ufe::ERecordType2str(rec));
     switch (rec)
     {
         case ufe::ERecordType::SerializedStreamHeader:
         {
             ufe::SerializationHeaderRecord rec;
             read(rec);
+            if (!check_header(rec))
+            {
+                // if header doesn't match abort further parsing
+                m_status = EFileStatus::Invalid;
+                return {};
+            }
+            m_status = EFileStatus::PartialRead;
             return {std::move(rec), record_json};
         } break;
         case ufe::ERecordType::ClassWithId:
@@ -115,7 +142,8 @@ AnyJson BinaryFileParser::read_record()
                 spdlog::error("multidimensional array");
                 return {};
             }
-            for (int i = 0; i < ba.Lengths[0]; ++i)
+            spdlog::debug("binary array id {}, elements type '{}'", ba.ObjectId, ufe::EBinaryTypeEnumeration2str(ba.TypeEnum));
+                for (int i = 0; i < ba.Lengths[0]; ++i)
             {
                 switch (ba.TypeEnum)
                 {
@@ -130,15 +158,7 @@ AnyJson BinaryFileParser::read_record()
                         break;
                     case ufe::EBinaryTypeEnumeration::Class:
                     {
-                        auto tmp = read_record().json_obj;
-                        if (!tmp.is_array())
-                        {
-                            record_json.push_back(tmp);
-                        }
-                        else
-                        {
-                            record_json.push_back(tmp.front());
-                        }
+                        ba.Data.push_back(read_record().dyn_obj);
                     } break;
                     case ufe::EBinaryTypeEnumeration::ObjectArray:
                         break;
@@ -152,6 +172,7 @@ AnyJson BinaryFileParser::read_record()
                         break;
                 }
             }
+            record_json = {"array", "binary"};
             return { std::move(ba), record_json };
         } break;
         case ufe::ERecordType::MemberPrimitiveTyped:
@@ -171,7 +192,9 @@ AnyJson BinaryFileParser::read_record()
             return { std::any{1}, record_json };
         } break;
         case ufe::ERecordType::MessageEnd:
-            break;
+        {
+            m_status = EFileStatus::FullRead;
+        }break;
         case ufe::ERecordType::BinaryLibrary:
         {
             ufe::BinaryLibrary bl;
@@ -181,9 +204,10 @@ AnyJson BinaryFileParser::read_record()
         } break;
         case ufe::ERecordType::ObjectNullMultiple256:
         {
-            uint8_t null_count = read<uint8_t>();
-            spdlog::debug("null_multiple_256 count: {}", null_count);
-            return { std::move(ufe::ObjectNull{}), record_json };
+            ufe::ObjectNullMultiple256 obj;
+            obj.NullCount = read<uint8_t>();
+            spdlog::debug("null_multiple_256 count: {}", obj.NullCount);
+            return { std::move(obj), record_json };
         } break;
         case ufe::ERecordType::ObjectNullMultiple:
             spdlog::error("Record type not implemented!");
@@ -210,10 +234,18 @@ AnyJson BinaryFileParser::read_record()
         {
             ufe::ArraySingleString arr;
             read(arr);
+            spdlog::debug("array_single_string  id {}, elements count {}", arr.ObjectId, arr.Length);
             for (int i = 0; i < arr.Length; ++i)
             {
                 nlohmann::ordered_json tmp;
                 auto record = read_record();
+                if (record.dyn_obj.type() == std::type_index(typeid(ufe::ObjectNullMultiple256)))
+                {
+                    // increase elements count if is a packed null object
+                    const auto obj = std::any_cast<ufe::ObjectNullMultiple256>(record.dyn_obj);
+                    i += obj.NullCount;
+                }
+                spdlog::debug(record.json_obj.dump());
                 arr.Data.push_back(record.dyn_obj);
                 record_json.push_back(record.json_obj);
             }
@@ -223,7 +255,7 @@ AnyJson BinaryFileParser::read_record()
         case ufe::ERecordType::MethodReturn:
         case ufe::ERecordType::InvalidType:
         default:
-            spdlog::error("Record type not implemented!");
+            spdlog::debug("Record type {:x} not implemented!", static_cast<uint8_t>(rec));
             spdlog::debug("filepos: {}", m_file.tellg());
             break;
     }
@@ -632,7 +664,6 @@ void BinaryFileParser::read_members_data(ufe::MemberTypeInfo& mti, ufe::ClassInf
                     }
                     catch (std::exception& e)
                     {
-                        spdlog::error(e.what());
                     }
                 }
                 else

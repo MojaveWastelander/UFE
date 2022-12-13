@@ -11,6 +11,7 @@
 #include <cereal/types/variant.hpp>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+#include "spdlog/sinks/basic_file_sink.h"
 #include "FileWriter.hpp"
 #include "BinaryFileParser.hpp"
 #include "JsonWriter.hpp"
@@ -64,23 +65,36 @@
 
 int main(int arg, char** argv)
 { 
-	std::filesystem::path item_path = argv[1];
-	std::filesystem::path json_path = argv[1];
-	std::filesystem::path item_path2 = R"(m:\Games\SteamLibrary\steamapps\common\Underrail\data\rules_2\characters\cavehopper)";
-
+	std::filesystem::path item_path = R"(m:\Games\SteamLibrary\steamapps\common\Underrail\data\rules_2\stores)";//= argv[1];
+	std::filesystem::path json_path = item_path ;//= argv[1];
+	std::filesystem::path item_path2 = item_path;
+    auto new_logger = spdlog::basic_logger_mt("default_logger", "logs/ufe.log", true);
+    spdlog::set_default_logger(new_logger);
 	spdlog::set_level(spdlog::level::debug);
 
-	json_path += ".json";
+	for (const auto& p : fs::recursive_directory_iterator{item_path})
 	{
-		BinaryFileParser reader;
-		if (reader.open(item_path))
-		{
-			reader.read_records();
+        std::filesystem::path json_path = p;//= argv[1];
+        json_path += ".json";
+        {
+            BinaryFileParser reader;
+            if (reader.open(p))
+            {
+                reader.read_records();
 
-			//reader.export_json(json_path);
-		}
-        JsonWriter writer;
-        writer.save(json_path, reader.get_records());
+                if (reader.status() != BinaryFileParser::EFileStatus::Invalid &&
+                    reader.status() != BinaryFileParser::EFileStatus::Empty)
+                {
+	                //reader.export_json(json_path);
+                    if (reader.status() == BinaryFileParser::EFileStatus::PartialRead)
+                    {
+                        spdlog::error("Partial file read!!!!");
+                    }
+	                JsonWriter writer;
+	                writer.save(json_path, reader.get_records());
+                }
+            }
+        }
 	}
 
 	//FileWriter writer;

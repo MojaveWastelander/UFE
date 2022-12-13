@@ -21,9 +21,17 @@ struct AnyJson
 class BinaryFileParser
 {
 public:
+    enum class EFileStatus
+    {
+        Empty,
+        PartialRead,
+        FullRead,
+        Invalid
+    };
     bool open(fs::path file_path);
     void close() { return m_file.close(); }
     size_t offset() { return m_file.tellg(); }
+    EFileStatus status() const noexcept { return m_status; }
 
     const std::vector<std::any>& get_records() const noexcept { return m_root_records; }
 
@@ -111,9 +119,11 @@ public:
     std::vector<char> raw_data();
 
 private:
+    bool check_header(const ufe::SerializationHeaderRecord& header);
     std::vector<std::pair<int32_t, std::any>> m_records;
     std::vector<std::any> m_root_records;
     std::fstream m_file;
     fs::path m_file_path;
+    EFileStatus m_status = EFileStatus::Empty;
     nlohmann::ordered_json m_json;
 };
