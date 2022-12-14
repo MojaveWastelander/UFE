@@ -11,6 +11,8 @@ JsonReader::JsonReader()
          //        return this->class_with_members_and_types(std::any_cast<ufe::ClassWithMembersAndTypes>(a));
          //    })
          //);
+        register_any_visitor<ufe::SerializationHeaderRecord>(&JsonReader::header);
+        register_any_visitor<ufe::BinaryLibrary>(&JsonReader::binary_library);
         register_any_visitor<ufe::ClassWithMembersAndTypes>(&JsonReader::class_with_members_and_types);
         register_any_visitor<ufe::ClassWithId>(&JsonReader::class_with_id);
         register_any_visitor<ufe::MemberReference>(&JsonReader::member_reference);

@@ -12,13 +12,6 @@ bool BinaryFileParser::open(fs::path file_path)
 	        if (m_file)
 	        {
 	            m_file_path = file_path;
-	            // init json
-	            m_json =
-	            {
-	                {
-	                    "records", {}
-	                }
-	            };
 	            return true;
 	        }
 	        spdlog::error("Could not open file for reading");
@@ -29,14 +22,6 @@ bool BinaryFileParser::open(fs::path file_path)
         spdlog::warn("File '{}' doesn't exist", file_path.string());
     }
     return false;
-}
-
-bool BinaryFileParser::export_json(fs::path json_path)
-{
-    std::ofstream out{ json_path };
-    std::cout << "Saving json file: " << json_path << '\n';
-    out << std::setw(4) << m_json;
-    return true;
 }
 
 const std::any& BinaryFileParser::get_record(int32_t id)
@@ -53,35 +38,51 @@ const std::any& BinaryFileParser::get_record(int32_t id)
 }
 
 
-bool BinaryFileParser::check_header(const ufe::SerializationHeaderRecord& header)
+bool BinaryFileParser::check_header()
 {
-    if (header.RootId.m_data != 1 &&
-        header.HeaderId.m_data != -1 &&
-        header.MajorVersion.m_data != 1 &&
-        header.MinorVersion.m_data != 0)
+    bool ret = true;
+    auto curr_off = m_file.tellg();
+    m_file.seekg(0);
+    ufe::ERecordType rec = get_record_type();
+    if (rec == ufe::ERecordType::SerializedStreamHeader)
     {
-        spdlog::warn("Header doesn't match, abort reading file");
-        return false;
+        ufe::SerializationHeaderRecord header;
+        read(header);
+        if (header.RootId.m_data != 1 &&
+            header.HeaderId.m_data != -1 &&
+            header.MajorVersion.m_data != 1 &&
+            header.MinorVersion.m_data != 0)
+        {
+            spdlog::info("Header doesn't match, abort reading file");
+            ret = false;
+        }
     }
-    return true;
+    else
+    {
+        spdlog::info("Header record type invalid, abort reading file");
+        ret = false;
+    }
+    m_file.seekg(curr_off);
+    return ret;
 }
 
 void BinaryFileParser::read_records()
 {
-    for (AnyJson a = read_record(); a.dyn_obj.has_value(); a = read_record())
+    if (check_header()) // skip parsing file if it has invalid header
     {
-        if (!a.json_obj.empty())
-        {
-            m_root_records.push_back(a.dyn_obj);
-            //spdlog::debug(a.json_obj.dump());
-            //m_json["records"].push_back(a.json_obj.front());
-        }
+	    for (std::any a = read_record(); a.has_value(); a = read_record())
+	    {
+            m_root_records.emplace_back(a);
+	    }
+    }
+    else
+    {
+        m_status = EFileStatus::Invalid;
     }
 }
 
-AnyJson BinaryFileParser::read_record()
+std::any BinaryFileParser::read_record()
 {
-    nlohmann::ordered_json record_json = {};
     ufe::ERecordType rec = get_record_type();
     spdlog::debug("Parsing record type: {}", ufe::ERecordType2str(rec));
     switch (rec)
@@ -90,20 +91,14 @@ AnyJson BinaryFileParser::read_record()
         {
             ufe::SerializationHeaderRecord rec;
             read(rec);
-            if (!check_header(rec))
-            {
-                // if header doesn't match abort further parsing
-                m_status = EFileStatus::Invalid;
-                return {};
-            }
             m_status = EFileStatus::PartialRead;
-            return {std::move(rec), record_json};
+            return std::move(rec);
         } break;
         case ufe::ERecordType::ClassWithId:
         {
             ufe::ClassWithId cwi;
-            read(cwi, record_json);
-            return { std::move(cwi), record_json };
+            read(cwi);
+            return std::move(cwi);
         } break;
         case ufe::ERecordType::SystemClassWithMembers:
             spdlog::error("Record type not implemented!");
@@ -114,16 +109,16 @@ AnyJson BinaryFileParser::read_record()
         case ufe::ERecordType::SystemClassWithMembersAndTypes:
         {
             ufe::ClassWithMembersAndTypes cmt;
-            read(cmt, record_json, true);
+            read(cmt, true);
             add_record(cmt.m_ClassInfo.ObjectId.m_data, std::any{ cmt });
-            return { std::move(cmt), record_json };
+            return std::move(cmt);
         } break;
         case ufe::ERecordType::ClassWithMembersAndTypes:
         {
             ufe::ClassWithMembersAndTypes cmt;
-            read(cmt, record_json);
+            read(cmt);
             add_record(cmt.m_ClassInfo.ObjectId.m_data, std::any{ cmt });
-            return { std::move(cmt), record_json };
+            return std::move(cmt);
         } break;
         case ufe::ERecordType::BinaryObjectString:
         {
@@ -131,7 +126,7 @@ AnyJson BinaryFileParser::read_record()
             read(bos);
             spdlog::debug("object string id: {}, value: '{}'", bos.m_ObjectId, bos.m_Value.m_data.m_str);
             add_record(bos.m_ObjectId, std::any{ bos });
-            return { std::move(bos), record_json };
+            return std::move(bos);
         } break;
         case ufe::ERecordType::BinaryArray:
         {
@@ -148,7 +143,7 @@ AnyJson BinaryFileParser::read_record()
                 switch (ba.TypeEnum)
                 {
                     case ufe::EBinaryTypeEnumeration::Primitive:
-                        read_primitive_element(std::get<ufe::EPrimitiveTypeEnumeration>(ba.AdditionalTypeInfo), record_json);
+                        ba.Data.emplace_back(read_primitive_element(std::get<ufe::EPrimitiveTypeEnumeration>(ba.AdditionalTypeInfo)));
                         break;
                     case ufe::EBinaryTypeEnumeration::String:
                         break;
@@ -158,7 +153,7 @@ AnyJson BinaryFileParser::read_record()
                         break;
                     case ufe::EBinaryTypeEnumeration::Class:
                     {
-                        ba.Data.push_back(read_record().dyn_obj);
+                        ba.Data.emplace_back(read_record());
                     } break;
                     case ufe::EBinaryTypeEnumeration::ObjectArray:
                         break;
@@ -172,8 +167,7 @@ AnyJson BinaryFileParser::read_record()
                         break;
                 }
             }
-            record_json = {"array", "binary"};
-            return { std::move(ba), record_json };
+            return std::move(ba);
         } break;
         case ufe::ERecordType::MemberPrimitiveTyped:
             spdlog::error("Record type not implemented!");
@@ -183,31 +177,30 @@ AnyJson BinaryFileParser::read_record()
             ufe::MemberReference ref;
             read(ref);
             spdlog::debug("reference id: {}", ref.m_idRef);
-            record_json["reference"] = ref.m_idRef;
-            return { std::move(ref), record_json };
+            return std::move(ref);
         } break;
         case ufe::ERecordType::ObjectNull:
         {
-            record_json = "ObjectNull";
-            return { std::any{ufe::ObjectNull{}}, record_json };
+            return std::any{ufe::ObjectNull{}};
         } break;
         case ufe::ERecordType::MessageEnd:
         {
             m_status = EFileStatus::FullRead;
+            spdlog::info("File parsed successfully");
         }break;
         case ufe::ERecordType::BinaryLibrary:
         {
             ufe::BinaryLibrary bl;
             read(bl);
             add_record(bl.LibraryId.m_data, std::any{ bl });
-            return { std::move(bl), record_json };
+            return std::move(bl);
         } break;
         case ufe::ERecordType::ObjectNullMultiple256:
         {
             ufe::ObjectNullMultiple256 obj;
             obj.NullCount = read<uint8_t>();
             spdlog::debug("null_multiple_256 count: {}", obj.NullCount);
-            return { std::move(obj), record_json };
+            return std::move(obj);
         } break;
         case ufe::ERecordType::ObjectNullMultiple:
             spdlog::error("Record type not implemented!");
@@ -221,10 +214,9 @@ AnyJson BinaryFileParser::read_record()
             {
                 nlohmann::ordered_json tmp;
                 auto x = arr.PrimitiveTypeEnum;
-                read_primitive_element(x, record_json);
-                record_json.push_back(tmp);
+                read_primitive_element(x);
             }
-            return { std::move(arr), record_json };
+            return std::move(arr);
         } break;
         case ufe::ERecordType::ArraySingleObject:
             spdlog::error("Record type not implemented!");
@@ -237,19 +229,16 @@ AnyJson BinaryFileParser::read_record()
             spdlog::debug("array_single_string  id {}, elements count {}", arr.ObjectId, arr.Length);
             for (int i = 0; i < arr.Length; ++i)
             {
-                nlohmann::ordered_json tmp;
                 auto record = read_record();
-                if (record.dyn_obj.type() == std::type_index(typeid(ufe::ObjectNullMultiple256)))
+                if (record.type() == std::type_index(typeid(ufe::ObjectNullMultiple256)))
                 {
                     // increase elements count if is a packed null object
-                    const auto obj = std::any_cast<ufe::ObjectNullMultiple256>(record.dyn_obj);
+                    const auto obj = std::any_cast<ufe::ObjectNullMultiple256>(record);
                     i += obj.NullCount;
                 }
-                spdlog::debug(record.json_obj.dump());
-                arr.Data.push_back(record.dyn_obj);
-                record_json.push_back(record.json_obj);
+                arr.Data.push_back(record);
             }
-            return { std::move(arr), record_json };
+            return std::move(arr);
         } break;
         case ufe::ERecordType::MethodCall:
         case ufe::ERecordType::MethodReturn:
@@ -262,53 +251,53 @@ AnyJson BinaryFileParser::read_record()
     return {};
 }
 
-void BinaryFileParser::read_primitive_element(ufe::EPrimitiveTypeEnumeration type, nlohmann::ordered_json& obj)
+std::any BinaryFileParser::read_primitive_element(ufe::EPrimitiveTypeEnumeration type)
 {
     switch (type)
     {
         case ufe::EPrimitiveTypeEnumeration::Boolean:
-            read_primitive<bool>(obj);
+            return read_primitive<bool>();
             break;
         case ufe::EPrimitiveTypeEnumeration::Byte:
-            read_primitive<char>(obj);
+            return read_primitive<char>();
             break;
         case ufe::EPrimitiveTypeEnumeration::Char:
-            read_primitive<char>(obj);
+            return read_primitive<char>();
             break;
         case ufe::EPrimitiveTypeEnumeration::Decimal:
             break;
         case ufe::EPrimitiveTypeEnumeration::Double:
-            read_primitive<double>(obj);
+            return read_primitive<double>();
             break;
         case ufe::EPrimitiveTypeEnumeration::Int16:
-            read_primitive<int16_t>(obj);
+            return read_primitive<int16_t>();
             break;
         case ufe::EPrimitiveTypeEnumeration::Int32:
-            read_primitive<int32_t>(obj);
+            return read_primitive<int32_t>();
             break;
         case ufe::EPrimitiveTypeEnumeration::Int64:
-            read_primitive<int64_t>(obj);
+            return read_primitive<int64_t>();
             break;
         case ufe::EPrimitiveTypeEnumeration::SByte:
             break;
         case ufe::EPrimitiveTypeEnumeration::Single:
             // special case
-            obj.push_back(float2str2double(read<float>()));
+            return read_primitive<float>();
             break;
         case ufe::EPrimitiveTypeEnumeration::TimeSpan:
-            read_primitive<uint64_t>(obj);
+            return read_primitive<uint64_t>();
             break;
         case ufe::EPrimitiveTypeEnumeration::DateTime:
-            read_primitive<uint64_t>(obj);
+            return read_primitive<uint64_t>();
             break;
         case ufe::EPrimitiveTypeEnumeration::UInt16:
-            read_primitive<uint16_t>(obj);
+            return read_primitive<uint16_t>();
             break;
         case ufe::EPrimitiveTypeEnumeration::UInt32:
-            read_primitive<uint32_t>(obj);
+            return read_primitive<uint32_t>();
             break;
         case ufe::EPrimitiveTypeEnumeration::UInt64:
-            read_primitive<uint64_t>(obj);
+            return read_primitive<uint64_t>();
             break;
         case ufe::EPrimitiveTypeEnumeration::Null:
             break;
@@ -317,6 +306,8 @@ void BinaryFileParser::read_primitive_element(ufe::EPrimitiveTypeEnumeration typ
         default:
             break;
     }
+    spdlog::warn("{} primitive type not implemented", ufe::EPrimitiveTypeEnumeration2str(type));
+    return {};
 }
 
 bool BinaryFileParser::read(ufe::BinaryLibrary& bl)
@@ -340,14 +331,9 @@ bool BinaryFileParser::read(ufe::ClassInfo& ci)
     return false;
 }
 
-bool BinaryFileParser::read(ufe::ClassWithMembersAndTypes& cmt, nlohmann::ordered_json& obj, bool system_class /* = false */)
+bool BinaryFileParser::read(ufe::ClassWithMembersAndTypes& cmt, bool system_class /* = false */)
 {
-    nlohmann::ordered_json cls = { {"class", {}} };
-
     read(cmt.m_ClassInfo);
-    cls["class"]["name"] = cmt.m_ClassInfo.Name.m_data.m_str;
-    cls["class"]["id"] = cmt.m_ClassInfo.ObjectId.m_data;
-    cls["class"]["members"] = {};
     auto& mti = cmt.m_MemberTypeInfo;
 
     for (int i = 0; i < cmt.m_ClassInfo.MemberCount.m_data; ++i)
@@ -407,15 +393,7 @@ bool BinaryFileParser::read(ufe::ClassWithMembersAndTypes& cmt, nlohmann::ordere
         mti.LibraryId = read<int32_t>();
         spdlog::debug("library id: {}", mti.LibraryId);
     }
-    read_members_data(mti, cmt.m_ClassInfo, cls["class"]["members"]);
-    try
-    {
-        obj.push_back(cls);
-    }
-    catch (std::exception& e)
-    {
-        std::cerr << e.what() << '\n';
-    }
+    read_members_data(mti, cmt.m_ClassInfo);
     return false;
 }
 
@@ -454,9 +432,8 @@ bool BinaryFileParser::read(ufe::BinaryObjectString& bos)
     return true;
 }
 
-bool BinaryFileParser::read(ufe::ClassWithId& cmt, nlohmann::ordered_json& obj)
+bool BinaryFileParser::read(ufe::ClassWithId& cmt)
 {
-    nlohmann::ordered_json cls = { {"class_id", {}} };
     IndexedData<int32_t> obj_id;
 
     read(obj_id);
@@ -470,12 +447,7 @@ bool BinaryFileParser::read(ufe::ClassWithId& cmt, nlohmann::ordered_json& obj)
         // clear data from copied reference
         cmt.m_MemberTypeInfo.Data.clear();
         cmt.m_ClassInfo.ObjectId = obj_id;
-        cls["class_id"]["name"] = cmt.m_ClassInfo.Name.m_data.m_str;
-        cls["class_id"]["id"] = cmt.m_ClassInfo.ObjectId.m_data;
-        cls["class_id"]["ref_id"] = cmt.MetadataId.m_data;
-        cls["class_id"]["members"] = {};
-        read_members_data(cmt.m_MemberTypeInfo, cmt.m_ClassInfo, cls["class_id"]["members"]);
-        obj.push_back(cls);
+        read_members_data(cmt.m_MemberTypeInfo, cmt.m_ClassInfo);
         return true;
     }
     return false;
@@ -568,14 +540,13 @@ bool BinaryFileParser::read(ufe::BinaryArray& arr_bin)
     return true;
 }
 
-void BinaryFileParser::read_members_data(ufe::MemberTypeInfo& mti, ufe::ClassInfo& ci, nlohmann::ordered_json& obj)
+void BinaryFileParser::read_members_data(ufe::MemberTypeInfo& mti, ufe::ClassInfo& ci)
 {
     auto it_add_info = mti.AdditionalInfos.cbegin();
     auto it_member_names = ci.MemberNames.cbegin();
 
     for (auto type : mti.BinaryTypeEnums)
     {
-        bool b = it_member_names->m_data.m_str == "E4:AO";
         switch (type)
         {
             case ufe::EBinaryTypeEnumeration::Primitive:
@@ -584,65 +555,61 @@ void BinaryFileParser::read_members_data(ufe::MemberTypeInfo& mti, ufe::ClassInf
                 {
                     case ufe::EPrimitiveTypeEnumeration::Boolean:
                     {
-                        process_member<bool>(obj, it_member_names, mti);
+                        process_member<bool>(it_member_names, mti);
                     } break;
                     case ufe::EPrimitiveTypeEnumeration::Byte:
                     {
-                        process_member<uint8_t>(obj, it_member_names, mti);
+                        process_member<uint8_t>(it_member_names, mti);
                     } break;
                     case ufe::EPrimitiveTypeEnumeration::Char:
                     {
-                        process_member<char>(obj, it_member_names, mti);
+                        process_member<char>(it_member_names, mti);
                     } break;
                     case ufe::EPrimitiveTypeEnumeration::Decimal:
                         throw std::exception("Not implemented!!!");
                         break;
                     case ufe::EPrimitiveTypeEnumeration::Double:
                     {
-                        process_member<double>(obj, it_member_names, mti);
+                        process_member<double>(it_member_names, mti);
                     } break;
                     case ufe::EPrimitiveTypeEnumeration::Int16:
                     {
-                        process_member<int16_t>(obj, it_member_names, mti);
+                        process_member<int16_t>(it_member_names, mti);
                     } break;
                     case ufe::EPrimitiveTypeEnumeration::Int32:
                     {
-                        process_member<int32_t>(obj, it_member_names, mti);
+                        process_member<int32_t>(it_member_names, mti);
                     } break;
                     case ufe::EPrimitiveTypeEnumeration::Int64:
                     {
-                        process_member<int64_t>(obj, it_member_names, mti);
+                        process_member<int64_t>(it_member_names, mti);
                     } break;
                     case ufe::EPrimitiveTypeEnumeration::SByte:
                         throw std::exception("Not implemented!!!");
                         break;
                     case ufe::EPrimitiveTypeEnumeration::Single:
                     {
-                        IndexedData<float> tmp;
-                        read(tmp);
-                        obj[it_member_names->m_data.m_str] = float2str2double(tmp.m_data);
-                        spdlog::debug("\t{} = {}", it_member_names->m_data.m_str, tmp.m_data);
-                        mti.Data.push_back(std::any{ tmp });
+                        process_member<float>(it_member_names, mti);
                     } break;
                     case ufe::EPrimitiveTypeEnumeration::TimeSpan:
                     {
-                        process_member<int64_t>(obj, it_member_names, mti);
+                        process_member<int64_t>(it_member_names, mti);
                     } break;
                     case ufe::EPrimitiveTypeEnumeration::DateTime:
                     {
-                        process_member<int64_t>(obj, it_member_names, mti);
+                        process_member<int64_t>(it_member_names, mti);
                     } break;
                     case ufe::EPrimitiveTypeEnumeration::UInt16:
                     {
-                        process_member<uint16_t>(obj, it_member_names, mti);
+                        process_member<uint16_t>(it_member_names, mti);
                     } break;
                     case ufe::EPrimitiveTypeEnumeration::UInt32:
                     {
-                        process_member<uint32_t>(obj, it_member_names, mti);
+                        process_member<uint32_t>(it_member_names, mti);
                     } break;
                     case ufe::EPrimitiveTypeEnumeration::UInt64:
                     {
-                        process_member<uint64_t>(obj, it_member_names, mti);
+                        process_member<uint64_t>(it_member_names, mti);
                     } break;
                     case ufe::EPrimitiveTypeEnumeration::Null:
                         throw std::exception("Not implemented!!!");
@@ -658,65 +625,23 @@ void BinaryFileParser::read_members_data(ufe::MemberTypeInfo& mti, ufe::ClassInf
             case ufe::EBinaryTypeEnumeration::String:
             {
                 auto bstr = read_record();
-                if (bstr.dyn_obj.has_value())
-                {
-                    try
-                    {
-                        const auto& str = std::any_cast<const ufe::BinaryObjectString&>(bstr.dyn_obj);
-                        obj[it_member_names->m_data.m_str] = str.m_Value.m_data.m_str;
-                    }
-                    catch (std::exception& e)
-                    {
-                    }
-                }
-                else
-                {
-                    obj[it_member_names->m_data.m_str] = {};
-                }
-                mti.Data.push_back(bstr.dyn_obj);
+                mti.Data.push_back(bstr);
             } break;
             case ufe::EBinaryTypeEnumeration::Object:
             {
                 auto rec = read_record();
-                obj[it_member_names->m_data.m_str] = rec.json_obj;
-                mti.Data.push_back(rec.dyn_obj);
+                mti.Data.push_back(rec);
             } break;
             case ufe::EBinaryTypeEnumeration::SystemClass:
             {
                 auto rec = read_record();
-                obj[it_member_names->m_data.m_str] = rec.json_obj;
-                mti.Data.push_back(rec.dyn_obj);
+                mti.Data.push_back(rec);
                 ++it_add_info;
             } break;
             case ufe::EBinaryTypeEnumeration::Class:
             {
-                //obj[it_member_names->m_data.m_str] = {};
-                nlohmann::ordered_json tmp;
                 auto nested_data = read_record();
-                mti.Data.push_back(nested_data.dyn_obj);
-                // read_record adds new record in json as array, this will add it as object for nested classes
-                // and in case of not null objects
-                if (!nested_data.json_obj.empty())
-                {
-                    //if (nested_data.dyn_obj.type() == typeid(ufe::ClassWithMembersAndTypes) || nested_data.dyn_obj.type() == typeid(ufe::ClassWithId))
-                    //{
-                    //    obj[it_member_names->m_data.m_str] = tmp.front();
-                    //}
-                    //else
-                    //{
-                    //    // assing whole data
-                    //    obj[it_member_names->m_data.m_str] = tmp;
-                    //}
-                    if (nested_data.json_obj.is_array())
-                    {
-                        obj[it_member_names->m_data.m_str] = nested_data.json_obj.front();
-                    }
-                    else
-                    {
-                        obj[it_member_names->m_data.m_str] = nested_data.json_obj;
-                    }
-                    spdlog::debug(obj[it_member_names->m_data.m_str].dump());
-                }
+                mti.Data.push_back(nested_data);
                 ++it_add_info;
             } break;
             case ufe::EBinaryTypeEnumeration::ObjectArray:
@@ -725,8 +650,7 @@ void BinaryFileParser::read_members_data(ufe::MemberTypeInfo& mti, ufe::ClassInf
             case ufe::EBinaryTypeEnumeration::None:
             {
                 auto record = read_record();
-                obj[it_member_names->m_data.m_str] = record.json_obj;
-                mti.Data.push_back(record.dyn_obj);
+                mti.Data.push_back(record);
             } break;
             default:
                 break;

@@ -83,6 +83,8 @@ private:
     void process_class_members(nlohmann::ordered_json& members, const  ufe::ClassInfo& ci, const  ufe::MemberTypeInfo& mti);
 
     void member_reference(const ufe::MemberReference& mref, const ojson& ctx) { /* do nothing */ }
+    void header(const ufe::SerializationHeaderRecord& mref, const ojson& ctx) { /* do nothing */ }
+    void binary_library(const ufe::BinaryLibrary& mref, const ojson& ctx) { /* do nothing */ }
     void binary_object_string(const ufe::BinaryObjectString& bos, const ojson& ctx);
     void class_with_members_and_types(const ufe::ClassWithMembersAndTypes& cmt, const ojson& ctx);
     void class_with_id(const ufe::ClassWithId& cwi, const ojson& ctx);

@@ -159,23 +159,19 @@
     <ClInclude Include="BinaryFileParser.hpp" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="IndexedData.hpp" />
-    <ClInclude Include="JsonHandler.hpp" />
     <ClInclude Include="JsonReader.hpp" />
     <ClInclude Include="JsonWriter.hpp" />
     <ClInclude Include="Records.hpp" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="UFE.h" />
-    <ClInclude Include="FileWriter.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BinaryFileParser.cpp" />
-    <ClCompile Include="JsonHandler.cpp" />
     <ClCompile Include="JsonReader.cpp" />
     <ClCompile Include="JsonWriter.cpp" />
     <ClCompile Include="Records.cpp" />
     <ClCompile Include="UFE.cpp" />
-    <ClCompile Include="FileWriter.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="UFE.rc" />

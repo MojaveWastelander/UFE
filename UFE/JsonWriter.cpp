@@ -164,7 +164,11 @@ nlohmann::ordered_json JsonWriter::process(const std::any& a)
         return it->second(a);
     }
     else {
-        spdlog::error("JsonWriter unregistered type: {}", a.type().name());
+        if (a.type() != std::type_index(typeid(ufe::SerializationHeaderRecord)) && 
+            a.type() != std::type_index(typeid(ufe::BinaryLibrary)))
+        {
+            spdlog::error("JsonWriter unregistered type: {}", a.type().name());
+        }
     }
     return nlohmann::ordered_json(nullptr);
 }
