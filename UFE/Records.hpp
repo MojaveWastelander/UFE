@@ -20,6 +20,10 @@ using ojson = nlohmann::ordered_json;
 // thus corverting via strings
 double float2str2double(float f);
 
+constexpr uint8_t GZIP_MAGIC_1 = 0x1F;
+constexpr uint8_t GZIP_MAGIC_2 = 0x8B;
+constexpr uint8_t GZIP_START_OFF = 24;
+
 namespace ufe
 {
     namespace fs = std::filesystem;

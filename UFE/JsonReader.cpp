@@ -1,4 +1,5 @@
 #include "JsonReader.hpp"
+#include <gzip\compress.hpp>
 JsonReader::JsonReader()
 {
     // assign all callbacks once per run
@@ -46,6 +47,12 @@ JsonReader::JsonReader()
 
 bool JsonReader::patch(std::filesystem::path json_path, std::filesystem::path binary_path, const BinaryFileParser& parser)
 {
+    if (parser.status() == BinaryFileParser::EFileStatus::Invalid || parser.status() == BinaryFileParser::EFileStatus::Empty)
+    {
+        spdlog::warn("File '{}' not valid for patching");
+        return false;
+    }
+
     if (std::filesystem::exists(json_path) && std::filesystem::is_regular_file(json_path))
     {
         if (std::filesystem::exists(binary_path) && std::filesystem::is_regular_file(binary_path))
@@ -60,11 +67,30 @@ bool JsonReader::patch(std::filesystem::path json_path, std::filesystem::path bi
                 process_records(parser.get_records());
                 update_strings();
 
-                parser.close();
+
                 std::ofstream bin{ binary_path, std::ios::binary };
                 if (bin)
                 {
-                    bin.write(m_raw_data.data(), m_raw_data.size());
+                    if (parser.file_type() == BinaryFileParser::EFileType::Compressed)
+                    {
+                        std::string compressed_data;
+                        try
+                        {
+                            compressed_data = gzip::compress(m_raw_data.data(), m_raw_data.size(), Z_BEST_SPEED);
+                        }
+                        catch (std::exception& e)
+                        {
+                            spdlog::critical("Failed to compress file: {}", e.what());
+                            return false;
+                        }
+                        auto compressed_header = parser.compressed_header();
+                        bin.write(compressed_header.data(), compressed_header.size());
+                        bin.write(compressed_data.data(), compressed_data.size());
+                    }
+                    else
+                    {
+                        bin.write(m_raw_data.data(), m_raw_data.size());
+                    }
                 }
             }
             catch (std::exception& e)

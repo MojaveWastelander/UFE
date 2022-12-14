@@ -66,6 +66,7 @@ private:
             {
                 spdlog::trace("\t'{}' ==> '{}'", data.m_data, jtmp);
             }
+
             memcpy(reinterpret_cast<void*>(&m_raw_data[data.m_offset]), reinterpret_cast<void*>(&jtmp), sizeof(T));
         }
         catch (std::exception& e)

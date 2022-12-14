@@ -1,4 +1,9 @@
 #include "BinaryFileParser.hpp"
+#include <gzip\config.hpp>
+#include <gzip\decompress.hpp>
+#include <gzip\utils.hpp>
+#include <gzip\version.hpp>
+#include <zlib.h>
 #include <algorithm>
 
 bool BinaryFileParser::open(fs::path file_path)
@@ -8,10 +13,39 @@ bool BinaryFileParser::open(fs::path file_path)
         if (fs::is_regular_file(file_path))
         {
 	        spdlog::info("Reading file: {} ", file_path.string());
-	        m_file.open(file_path, std::ios::binary | std::ios::in | std::ios::out);
-	        if (m_file)
+            std::ifstream in_file;
+	        in_file.open(file_path, std::ios::binary | std::ios::in | std::ios::out);
+	        if (m_file && fs::file_size(file_path) > GZIP_START_OFF)
 	        {
-	            m_file_path = file_path;
+                m_raw_data.resize(GZIP_START_OFF + 2);
+                in_file.read(m_raw_data.data(), m_raw_data.size());
+                in_file.seekg(0);
+                // file is compressed
+                if (static_cast<uint8_t>(m_raw_data[GZIP_START_OFF]) == GZIP_MAGIC_1 &&
+                    static_cast<uint8_t>(m_raw_data[GZIP_START_OFF + 1]) == GZIP_MAGIC_2)
+                {
+                    m_compressed_header.resize(GZIP_START_OFF);
+                    in_file.read(m_compressed_header.data(), m_compressed_header.size());
+                    m_raw_data.resize(fs::file_size(file_path) - GZIP_START_OFF);
+                    in_file.read(m_raw_data.data(), m_raw_data.size());
+                    try
+                    {
+                        m_raw_data = gzip::decompress(m_raw_data.data(), m_raw_data.size());
+                        m_file.str(m_raw_data);
+                        m_file_type = EFileType::Compressed;
+                    }
+                    catch (std::exception& e)
+                    {
+                        spdlog::critical("Failed to decompress file: {}", e.what());
+                    }
+                }
+                else
+                {
+                    m_raw_data.resize(fs::file_size(file_path));
+                    in_file.read(m_raw_data.data(), m_raw_data.size());
+                    m_file.str(std::move(m_raw_data));
+                }
+                m_file_path = file_path;
 	            return true;
 	        }
 	        spdlog::error("Could not open file for reading");
@@ -661,13 +695,7 @@ void BinaryFileParser::read_members_data(ufe::MemberTypeInfo& mti, ufe::ClassInf
 
 std::vector<char> BinaryFileParser::raw_data() const
 {
-    std::vector<char> tmp;
-    auto curr_offset = m_file.tellg();
-    m_file.seekg(0);
-    tmp.resize(fs::file_size(m_file_path));
-    m_file.read(tmp.data(), tmp.size());
-    m_file.seekg(curr_offset);
-    return tmp;
+    return std::vector<char>(m_raw_data.begin(), m_raw_data.end());
 }
 
 template<>

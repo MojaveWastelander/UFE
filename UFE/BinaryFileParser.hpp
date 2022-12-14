@@ -22,11 +22,17 @@ public:
         FullRead,
         Invalid
     };
+    enum class EFileType
+    {
+        Compressed,
+        Uncompressed
+    };
     bool open(fs::path file_path);
-    void close() const { return m_file.close(); }
     EFileStatus status() const noexcept { return m_status; }
+    EFileType file_type() const noexcept { return m_file_type; }
 
     const std::vector<std::any>& get_records() const noexcept { return m_root_records; }
+    std::string compressed_header() const noexcept { return m_compressed_header; }
 
     void read_records();
 
@@ -109,5 +115,8 @@ private:
     std::vector<std::any> m_root_records;
     fs::path m_file_path;
     EFileStatus m_status = EFileStatus::Empty;
-    mutable std::fstream m_file;
+    EFileType m_file_type = EFileType::Uncompressed;
+    std::string m_compressed_header;
+    std::string m_raw_data;
+    mutable std::istringstream m_file;
 };

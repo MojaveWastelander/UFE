@@ -65,7 +65,7 @@
 
 int main(int arg, char** argv)
 { 
-	std::filesystem::path item_path = R"(m:\Games\SteamLibrary\steamapps\common\Underrail\data\rules_2)";//= argv[1];
+	std::filesystem::path item_path = R"(m:\Games\SteamLibrary\steamapps\common\Underrail\data\rules_2\test)";//= argv[1];
 	std::filesystem::path json_path = item_path ;//= argv[1];
 	std::filesystem::path item_path2 = item_path;
     auto new_logger = spdlog::basic_logger_mt("default_logger", "logs/ufe.log", true);
@@ -91,11 +91,10 @@ int main(int arg, char** argv)
                         spdlog::error("Partial file read!!!!");
                         //continue;
                     }
-	                JsonWriter writer;
-	                writer.save(json_path, parser.get_records());
+	                //JsonWriter writer;
+	                //writer.save(json_path, parser.get_records());
                     JsonReader reader;
                     reader.patch(json_path, p, parser);
-                    break;
                 }
             }
         }
