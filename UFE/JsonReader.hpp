@@ -79,14 +79,19 @@ private:
 
 
     const ojson& find_class_by_id(const ojson& ctx, const ufe::ClassInfo& ci, std::string class_type);
+    const ojson& find_array_by_id(const ojson& ctx, int32_t arr_id);
     void process_class_members(nlohmann::ordered_json& members, const  ufe::ClassInfo& ci, const  ufe::MemberTypeInfo& mti);
 
     void member_reference(const ufe::MemberReference& mref, const ojson& ctx) { /* do nothing */ }
     void binary_object_string(const ufe::BinaryObjectString& bos, const ojson& ctx);
     void class_with_members_and_types(const ufe::ClassWithMembersAndTypes& cmt, const ojson& ctx);
     void class_with_id(const ufe::ClassWithId& cwi, const ojson& ctx);
-    //ojson array_single_string(const ufe::ArraySingleString& arr);
-    //ojson array_binary(const ufe::BinaryArray& arr);
+    void array_single_string(const ufe::ArraySingleString& arr, const ojson& ctx);
+    void array_binary(const ufe::BinaryArray& arr, const ojson& ctx);
+    void array_single_primitive(const ufe::ArraySinglePrimitive& arr, const ojson& ctx);
+
+    void process_array(const  ojson& values, const  std::vector<std::any>& data, std::string arr_type, int32_t arr_id);
+
     void value_bool(const IndexedData<bool>& x, const ojson& context) { process_member<bool>(x, context); }
     void value_char(const IndexedData<char>& x, const ojson& context) { process_member<char>(x, context); }
     void value_uchar(const IndexedData<unsigned char>& x, const ojson& context) { process_member<unsigned char>(x, context); }
@@ -100,7 +105,7 @@ private:
     void value_double(const IndexedData<double>& x, const ojson& context) { process_member<double>(x, context); }
     //void value_void(void) { return ojson(nullptr); }
     void object_null(ufe::ObjectNull, const ojson& ctx) { /* do nothing */ }
-    //void object_null_256(ufe::ObjectNullMultiple256 obj);
+    void object_null_256(ufe::ObjectNullMultiple256 obj, const ojson& ctx) { /* do nothing */ }
     static std::unordered_map<
         std::type_index, std::function<void(std::any const&, const ojson& context)>>
         m_any_visitor;

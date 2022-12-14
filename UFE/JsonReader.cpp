@@ -1,7 +1,7 @@
 #include "JsonReader.hpp"
 JsonReader::JsonReader()
 {
-    // assign all callbacks
+    // assign all callbacks once per run
     if (m_any_visitor.empty())
     {
         //register_any_visitor<ufe::ClassWithMembersAndTypes>( &JsonWriter::class_with_members_and_types);
@@ -15,7 +15,11 @@ JsonReader::JsonReader()
         register_any_visitor<ufe::ClassWithId>(&JsonReader::class_with_id);
         register_any_visitor<ufe::MemberReference>(&JsonReader::member_reference);
         register_any_visitor<ufe::BinaryObjectString>(&JsonReader::binary_object_string);
+        register_any_visitor<ufe::ArraySingleString>(&JsonReader::array_single_string);
+        register_any_visitor<ufe::ArraySinglePrimitive>(&JsonReader::array_single_primitive);
+        register_any_visitor<ufe::BinaryArray>(&JsonReader::array_binary);
         register_any_visitor<ufe::ObjectNull>(&JsonReader::object_null);
+        register_any_visitor<ufe::ObjectNullMultiple256>(&JsonReader::object_null_256);
         register_any_visitor<IndexedData<bool>>(&JsonReader::value_bool);
         register_any_visitor<IndexedData<char>>(&JsonReader::value_char);
         register_any_visitor<IndexedData<unsigned char>>(&JsonReader::value_uchar);
@@ -184,6 +188,44 @@ void JsonReader::class_with_id(const ufe::ClassWithId& cwi, const ojson& ctx)
     }
 }
 
+void JsonReader::array_single_string(const ufe::ArraySingleString& arr, const ojson& ctx)
+{
+    const auto& values = find_array_by_id(ctx, arr.ObjectId);
+    process_array(values, arr.Data, "ArraySingleString", arr.ObjectId);
+}
+
+void JsonReader::array_binary(const ufe::BinaryArray& arr, const ojson& ctx)
+{
+    const auto& values = find_array_by_id(ctx, arr.ObjectId);
+    process_array(values, arr.Data, "BinaryArray", arr.ObjectId);
+}
+
+void JsonReader::array_single_primitive(const ufe::ArraySinglePrimitive& arr, const ojson& ctx)
+{
+    const auto& values = find_array_by_id(ctx, arr.ObjectId);
+    process_array(values, arr.Data, "ArraySinglePrimitive", arr.ObjectId);
+}
+
+void JsonReader::process_array(const ojson& values, const std::vector<std::any>& data, std::string arr_type, int32_t arr_id)
+{
+    if (values.is_array())
+    {
+        if (values.size() == data.size())
+        {
+            auto it_bin_values = data.cbegin();
+            for (const auto& json_val : values)
+            {
+                process(*it_bin_values, json_val);
+                ++it_bin_values;
+            }
+        }
+        else
+        {
+            spdlog::error("{} with id {} values count mismatch with json count", arr_type, arr_id);
+        }
+    }
+}
+
 const ojson& JsonReader::find_class_by_id(const ojson& ctx, const ufe::ClassInfo& ci, std::string class_type)
 {
     static ojson dummy(nullptr);
@@ -212,6 +254,27 @@ const ojson& JsonReader::find_class_by_id(const ojson& ctx, const ufe::ClassInfo
     return dummy;
 }
 
+const ojson& JsonReader::find_array_by_id(const ojson& ctx, int32_t arr_id)
+{
+    static ojson dummy(nullptr);
+    // root class or array element
+    if (ctx.is_array())
+    {
+        for (const auto& rec : ctx)
+        {
+            if (rec.contains("array_id") && rec.contains("values"))
+            {
+                auto id = rec["array_id"].get<int32_t>();
+                if (id == arr_id)
+                {
+                    return rec["values"];
+                }
+            }
+        }
+    }
+    return dummy;
+}
+
 void JsonReader::process(const std::any& a, const ojson& context)
 {
     if (const auto it = m_any_visitor.find(std::type_index(a.type()));
@@ -219,6 +282,6 @@ void JsonReader::process(const std::any& a, const ojson& context)
         it->second(a, context);
     }
     else {
-        spdlog::error("Unregistered type: {}", a.type().name());
+        spdlog::error("JsonReader unregistered type: {}", a.type().name());
     }
 }

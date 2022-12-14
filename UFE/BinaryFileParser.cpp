@@ -618,10 +618,10 @@ void BinaryFileParser::read_members_data(ufe::MemberTypeInfo& mti, ufe::ClassInf
                         break;
                     case ufe::EPrimitiveTypeEnumeration::Single:
                     {
-                        // 
-                        float tmp = read<float>();
-                        obj[it_member_names->m_data.m_str] = float2str2double(tmp);
-                        spdlog::debug("\t{} = {}", it_member_names->m_data.m_str, tmp);
+                        IndexedData<float> tmp;
+                        read(tmp);
+                        obj[it_member_names->m_data.m_str] = float2str2double(tmp.m_data);
+                        spdlog::debug("\t{} = {}", it_member_names->m_data.m_str, tmp.m_data);
                         mti.Data.push_back(std::any{ tmp });
                     } break;
                     case ufe::EPrimitiveTypeEnumeration::TimeSpan:
