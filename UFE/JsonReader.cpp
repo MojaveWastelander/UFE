@@ -76,7 +76,7 @@ bool JsonReader::patch(std::filesystem::path json_path, std::filesystem::path bi
                         std::string compressed_data;
                         try
                         {
-                            compressed_data = gzip::compress(m_raw_data.data(), m_raw_data.size(), Z_BEST_SPEED);
+                            compressed_data = gzip::compress(m_raw_data.data(), m_raw_data.size(), Z_DEFAULT_COMPRESSION);
                         }
                         catch (std::exception& e)
                         {
@@ -172,6 +172,9 @@ void JsonReader::class_with_members_and_types(const ufe::ClassWithMembersAndType
         const auto& members = cls["members"];
         auto it_member_names = cmt.m_ClassInfo.MemberNames.cbegin();
         spdlog::debug("Processing class '{}' with id {}", cmt.m_ClassInfo.Name.m_data.m_str, cmt.m_ClassInfo.ObjectId.m_data);
+        // check if class name was updated
+        process_string(cmt.m_ClassInfo.Name, cls["name"]);
+
         for (const auto& rec : cmt.m_MemberTypeInfo.Data)
         {
             
@@ -252,6 +255,19 @@ void JsonReader::process_array(const ojson& values, const std::vector<std::any>&
             spdlog::error("{} with id {} values count mismatch with json count", arr_type, arr_id);
         }
     }
+}
+
+void JsonReader::process_string(const IndexedData<ufe::LengthPrefixedString>& ilps, const std::string& json_string)
+{
+    if (json_string != ilps.m_data.m_str)
+    {
+        spdlog::warn("orig_str: {}", ilps.m_data.m_str);
+        spdlog::warn("json_str: {}", json_string);
+        auto tmp = ilps;
+        tmp.m_data.update_string(json_string);
+        m_updated_strings.push_back(tmp);
+    }
+
 }
 
 const ojson& JsonReader::find_class_by_id(const ojson& ctx, const ufe::ClassInfo& ci, std::string class_type)

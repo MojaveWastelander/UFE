@@ -95,6 +95,7 @@ private:
 
     void process_array(const  ojson& values, const  std::vector<std::any>& data, std::string arr_type, int32_t arr_id);
 
+    void process_string(const IndexedData<ufe::LengthPrefixedString>& ilps, const std::string& json_string);
     void value_bool(const IndexedData<bool>& x, const ojson& context) { process_member<bool>(x, context); }
     void value_char(const IndexedData<char>& x, const ojson& context) { process_member<char>(x, context); }
     void value_uchar(const IndexedData<unsigned char>& x, const ojson& context) { process_member<unsigned char>(x, context); }
