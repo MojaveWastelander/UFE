@@ -82,18 +82,20 @@ bool BinaryFileParser::check_header()
     {
         ufe::SerializationHeaderRecord header;
         read(header);
-        if (header.RootId.m_data != 1 &&
-            header.HeaderId.m_data != -1 &&
-            header.MajorVersion.m_data != 1 &&
+        if (header.RootId.m_data != 1 ||
+            header.HeaderId.m_data != -1 ||
+            header.MajorVersion.m_data != 1 ||
             header.MinorVersion.m_data != 0)
         {
-            spdlog::info("Header doesn't match, abort reading file");
+            spdlog::debug("Header doesn't match, abort reading file");
+            m_status = EFileStatus::Invalid;
             ret = false;
         }
     }
     else
     {
-        spdlog::info("Header record type invalid, abort reading file");
+        spdlog::debug("Header record type invalid, abort reading file");
+        m_status = EFileStatus::Invalid;
         ret = false;
     }
     m_file.seekg(curr_off);

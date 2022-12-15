@@ -66,7 +66,12 @@ private:
             {
                 spdlog::trace("\t'{}' ==> '{}'", data.m_data, jtmp);
             }
-
+            if (data.m_offset > m_raw_data.size())
+            {
+                spdlog::critical("data offset > file size, abort parsing");
+                m_stop_parsing = true;
+                return;
+            }
             memcpy(reinterpret_cast<void*>(&m_raw_data[data.m_offset]), reinterpret_cast<void*>(&jtmp), sizeof(T));
         }
         catch (std::exception& e)
@@ -116,6 +121,7 @@ private:
     void process(const std::any& a, const ojson& context);
     nlohmann::ordered_json m_json;
     std::vector<char> m_raw_data;
+    bool m_stop_parsing = false;
     std::vector <IndexedData<ufe::LengthPrefixedString>> m_updated_strings;
 };
 

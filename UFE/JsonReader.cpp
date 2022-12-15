@@ -111,7 +111,10 @@ bool JsonReader::process_records(const std::vector<std::any>& records)
     const auto& json_records = m_json["records"];
     for (const auto& rec : records)
     {
-        process(rec, json_records);
+        if (!m_stop_parsing)
+        {
+            process(rec, json_records);
+        }
     }
     return false;
 }
