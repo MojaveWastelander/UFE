@@ -52,6 +52,7 @@ bool JsonWriter::save(std::filesystem::path json_path, const std::vector<std::an
     std::ofstream out_json{ json_path };
     if (out_json)
     {
+        spdlog::debug("Parsing records into json");
         process_records(records);
         spdlog::info("Exporting data to '{}'", json_path.string());
         out_json << std::setw(4) << m_json;

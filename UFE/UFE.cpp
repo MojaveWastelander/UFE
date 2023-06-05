@@ -20,7 +20,7 @@
 #define WIN32_LEAN_AND_MEAN
 
 
-bool skip_extension(const std::filesystem::path& p)
+bool skip_path(const std::filesystem::path& p)
 {
     if (fs::is_directory(p) || (p.has_extension() && p.extension() == ".json"))
     {
@@ -48,7 +48,7 @@ void parse_file(const fs::path& p, const CLIParser& cli)
         }
     };
 
-    if (!skip_extension(p) && parser.open(p))
+    if (!skip_path(p) && parser.open(p))
     {
         parser.read_records();
 
@@ -144,7 +144,7 @@ void validate_directory(fs::path dir)
     for (const auto& p : fs::recursive_directory_iterator{ dir })
     {
         // skip json files
-        if (skip_extension(p))
+        if (skip_path(p))
         {
             continue;
         }
