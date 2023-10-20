@@ -58,17 +58,17 @@ private:
     ojson class_with_id(const ufe::ClassWithId& cwi);
     ojson array_single_string(const ufe::ArraySingleString& arr);
     ojson array_binary(const ufe::BinaryArray& arr);
-    ojson value_char(const IndexedData<char>& x) { return ojson(x.m_data); }
-    ojson value_uchar(const IndexedData<unsigned char>& x) { return ojson(x.m_data); }
-    ojson value_bool(const IndexedData<bool>& x) { return ojson(x.m_data); }
-    ojson value_int32(const IndexedData<int32_t>& x) { return ojson(x.m_data); }
-    ojson value_uint32(const IndexedData<uint32_t>& x) { return ojson(x.m_data); }
-    ojson value_int16(const IndexedData<int16_t>& x) { return ojson(x.m_data); }
-    ojson value_uint16(const IndexedData<uint16_t>& x) { return ojson(x.m_data); }
-    ojson value_int64(const IndexedData<int64_t>& x) { return ojson(x.m_data); }
-    ojson value_uint64(const IndexedData<uint64_t>& x) { return ojson(x.m_data); }
-    ojson value_float(const IndexedData<float>& x) { return ojson(float2str2double(x.m_data)); }
-    ojson value_double(const IndexedData<double>& x) { return ojson(x.m_data); }
+    ojson value_char(const IndexedData<char>& x) { return ojson(x.value); }
+    ojson value_uchar(const IndexedData<unsigned char>& x) { return ojson(x.value); }
+    ojson value_bool(const IndexedData<bool>& x) { return ojson(x.value); }
+    ojson value_int32(const IndexedData<int32_t>& x) { return ojson(x.value); }
+    ojson value_uint32(const IndexedData<uint32_t>& x) { return ojson(x.value); }
+    ojson value_int16(const IndexedData<int16_t>& x) { return ojson(x.value); }
+    ojson value_uint16(const IndexedData<uint16_t>& x) { return ojson(x.value); }
+    ojson value_int64(const IndexedData<int64_t>& x) { return ojson(x.value); }
+    ojson value_uint64(const IndexedData<uint64_t>& x) { return ojson(x.value); }
+    ojson value_float(const IndexedData<float>& x) { return ojson(float2str2double(x.value)); }
+    ojson value_double(const IndexedData<double>& x) { return ojson(x.value); }
     ojson value_void(void) { return ojson(nullptr); }
     ojson object_null(ufe::ObjectNull) { return ojson(nullptr); }
     ojson object_null_256(ufe::ObjectNullMultiple256 obj);

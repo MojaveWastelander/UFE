@@ -15,17 +15,17 @@ bool BinaryFileParser::open(fs::path file_path)
 	        spdlog::info("Reading file: {} ", file_path.string());
             std::ifstream in_file;
 	        in_file.open(file_path, std::ios::binary | std::ios::in | std::ios::out);
-	        if (m_file && fs::file_size(file_path) > GZIP_START_OFF)
+	        if (m_file && fs::file_size(file_path) > (GZIP_START_OFF + 4))
 	        {
-                m_raw_data.resize(GZIP_START_OFF + 2);
+                m_raw_data.resize(GZIP_START_OFF + 4);
                 in_file.read(m_raw_data.data(), m_raw_data.size());
                 in_file.seekg(0);
                 // file is compressed
                 if (static_cast<uint8_t>(m_raw_data[GZIP_START_OFF]) == GZIP_MAGIC_1 &&
                     static_cast<uint8_t>(m_raw_data[GZIP_START_OFF + 1]) == GZIP_MAGIC_2)
                 {
-                    m_compressed_header.resize(GZIP_START_OFF);
-                    in_file.read(m_compressed_header.data(), m_compressed_header.size());
+                    m_header.resize(GZIP_START_OFF);
+                    in_file.read(m_header.data(), m_header.size());
                     m_raw_data.resize(fs::file_size(file_path) - GZIP_START_OFF);
                     in_file.read(m_raw_data.data(), m_raw_data.size());
                     try
@@ -39,11 +39,20 @@ bool BinaryFileParser::open(fs::path file_path)
                         spdlog::critical("Failed to decompress file: {}", e.what());
                     }
                 }
+                else if (*reinterpret_cast<uint32_t*>(&m_raw_data[GZIP_START_OFF]) == 0x00000100)
+                {
+                    // uncompressed file
+                    m_header.resize(GZIP_START_OFF);
+                    in_file.read(m_header.data(), m_header.size());
+                    m_raw_data.resize(fs::file_size(file_path) - GZIP_START_OFF);
+                    in_file.read(m_raw_data.data(), m_raw_data.size());
+                    m_file.str(m_raw_data);
+                    m_file_type = EFileType::Uncompressed;
+                }
                 else
                 {
-                    m_raw_data.resize(fs::file_size(file_path));
-                    in_file.read(m_raw_data.data(), m_raw_data.size());
-                    m_file.str(std::move(m_raw_data));
+                    // TODO: handle other file types
+                    return false;
                 }
                 m_file_path = file_path;
 	            return true;
@@ -61,7 +70,7 @@ bool BinaryFileParser::open(fs::path file_path)
 const std::any& BinaryFileParser::get_record(int32_t id)
 {
     static std::any dummy;
-    for (auto& rec : m_records)
+    for (const auto& rec : m_records)
     {
         if (rec.first == id)
         {
@@ -78,14 +87,16 @@ bool BinaryFileParser::check_header()
     auto curr_off = m_file.tellg();
     m_file.seekg(0);
     ufe::ERecordType rec = get_record_type();
+    // default is partially parsed file if at least header is ok
+    m_status = EFileStatus::PartialRead;
     if (rec == ufe::ERecordType::SerializedStreamHeader)
     {
         ufe::SerializationHeaderRecord header;
         read(header);
-        if (header.RootId.m_data != 1 ||
-            header.HeaderId.m_data != -1 ||
-            header.MajorVersion.m_data != 1 ||
-            header.MinorVersion.m_data != 0)
+        if (header.RootId.value != 1 ||
+            header.HeaderId.value != -1 ||
+            header.MajorVersion.value != 1 ||
+            header.MinorVersion.value != 0)
         {
             spdlog::debug("Header doesn't match, abort reading file");
             m_status = EFileStatus::Invalid;
@@ -121,170 +132,220 @@ std::any BinaryFileParser::read_record()
 {
     ufe::ERecordType rec = get_record_type();
     spdlog::debug("Parsing record type: {}", ufe::ERecordType2str(rec));
+    auto record_type_not_implemented = [this](ufe::ERecordType rec)
+        {
+            spdlog::debug("Record type {} ({:x}) not implemented!", ufe::ERecordType2str(rec), static_cast<uint8_t>(rec));
+            spdlog::debug("filepos: {}", m_file.tellg());
+        };
+
     switch (rec)
     {
         case ufe::ERecordType::SerializedStreamHeader:
-        {
-            ufe::SerializationHeaderRecord rec;
-            read(rec);
-            m_status = EFileStatus::PartialRead;
-            return std::move(rec);
-        } break;
+            return get_SerializedStreamHeader();
+
         case ufe::ERecordType::ClassWithId:
-        {
-            ufe::ClassWithId cwi;
-            read(cwi);
-            return std::move(cwi);
-        } break;
+            return get_ClassWithId();
+
         case ufe::ERecordType::SystemClassWithMembers:
-            spdlog::error("Record type not implemented!");
+            record_type_not_implemented(rec);
             break;
+
         case ufe::ERecordType::ClassWithMembers:
-            spdlog::error("Record type not implemented!");
+            record_type_not_implemented(rec);
             break;
+
         case ufe::ERecordType::SystemClassWithMembersAndTypes:
-        {
-            ufe::ClassWithMembersAndTypes cmt;
-            read(cmt, true);
-            add_record(cmt.m_ClassInfo.ObjectId.m_data, std::any{ cmt });
-            return std::move(cmt);
-        } break;
+            return get_SystemClassWithMembersAndTypes();
+
         case ufe::ERecordType::ClassWithMembersAndTypes:
-        {
-            ufe::ClassWithMembersAndTypes cmt;
-            read(cmt);
-            add_record(cmt.m_ClassInfo.ObjectId.m_data, std::any{ cmt });
-            return std::move(cmt);
-        } break;
+            return get_ClassWithMembersAndTypes();
+
         case ufe::ERecordType::BinaryObjectString:
-        {
-            ufe::BinaryObjectString bos;
-            read(bos);
-            spdlog::debug("object string id: {}, value: '{}'", bos.m_ObjectId, bos.m_Value.m_data.m_str);
-            add_record(bos.m_ObjectId, std::any{ bos });
-            return std::move(bos);
-        } break;
+            return get_BinaryObjectString();
+
         case ufe::ERecordType::BinaryArray:
-        {
-            ufe::BinaryArray ba;
-            read(ba);
-            if (ba.Rank > 1)
-            {
-                spdlog::error("multidimensional array");
-                return {};
-            }
-            spdlog::debug("binary array id {}, elements type '{}'", ba.ObjectId, ufe::EBinaryTypeEnumeration2str(ba.TypeEnum));
-                for (int i = 0; i < ba.Lengths[0]; ++i)
-            {
-                switch (ba.TypeEnum)
-                {
-                    case ufe::EBinaryTypeEnumeration::Primitive:
-                        ba.Data.emplace_back(read_primitive_element(std::get<ufe::EPrimitiveTypeEnumeration>(ba.AdditionalTypeInfo)));
-                        break;
-                    case ufe::EBinaryTypeEnumeration::String:
-                        break;
-                    case ufe::EBinaryTypeEnumeration::Object:
-                        break;
-                    case ufe::EBinaryTypeEnumeration::SystemClass:
-                        break;
-                    case ufe::EBinaryTypeEnumeration::Class:
-                    {
-                        ba.Data.emplace_back(read_record());
-                    } break;
-                    case ufe::EBinaryTypeEnumeration::ObjectArray:
-                        break;
-                    case ufe::EBinaryTypeEnumeration::StringArray:
-                        break;
-                    case ufe::EBinaryTypeEnumeration::PrimitiveArray:
-                        break;
-                    case ufe::EBinaryTypeEnumeration::None:
-                        break;
-                    default:
-                        break;
-                }
-            }
-            return std::move(ba);
-        } break;
+            return get_BinaryArray();
+
         case ufe::ERecordType::MemberPrimitiveTyped:
-            spdlog::error("Record type not implemented!");
+            record_type_not_implemented(rec);
             break;
+
         case ufe::ERecordType::MemberReference:
-        {
-            ufe::MemberReference ref;
-            read(ref);
-            spdlog::debug("reference id: {}", ref.m_idRef);
-            return std::move(ref);
-        } break;
+            return get_MemberReference();
+
         case ufe::ERecordType::ObjectNull:
-        {
             return std::any{ufe::ObjectNull{}};
-        } break;
+
         case ufe::ERecordType::MessageEnd:
         {
             m_status = EFileStatus::FullRead;
             spdlog::info("File parsed successfully");
-        }break;
+        } break;
+
         case ufe::ERecordType::BinaryLibrary:
-        {
-            ufe::BinaryLibrary bl;
-            read(bl);
-            add_record(bl.LibraryId.m_data, std::any{ bl });
-            return std::move(bl);
-        } break;
+            return get_BinaryLibrary();
+
         case ufe::ERecordType::ObjectNullMultiple256:
-        {
-            ufe::ObjectNullMultiple256 obj;
-            obj.NullCount = read<uint8_t>();
-            spdlog::debug("null_multiple_256 count: {}", obj.NullCount);
-            return std::move(obj);
-        } break;
+            return get_ObjectNullMultiple256();
+
         case ufe::ERecordType::ObjectNullMultiple:
-            spdlog::error("Record type not implemented!");
-            spdlog::debug("filepos: {}", m_file.tellg());
+            record_type_not_implemented(rec);
             break;
+
         case ufe::ERecordType::ArraySinglePrimitive:
-        {
-            ufe::ArraySinglePrimitive arr;
-            read(arr);
-            for (int i = 0; i < arr.Length; ++i)
-            {
-                nlohmann::ordered_json tmp;
-                auto x = arr.PrimitiveTypeEnum;
-                read_primitive_element(x);
-            }
-            return std::move(arr);
-        } break;
+            return get_ArraySinglePrimitive();
+
         case ufe::ERecordType::ArraySingleObject:
-            spdlog::error("Record type not implemented!");
-            spdlog::debug("filepos: {}", m_file.tellg());
+            record_type_not_implemented(rec);
             break;
         case ufe::ERecordType::ArraySingleString:
-        {
-            ufe::ArraySingleString arr;
-            read(arr);
-            spdlog::debug("array_single_string  id {}, elements count {}", arr.ObjectId, arr.Length);
-            for (int i = 0; i < arr.Length; ++i)
-            {
-                auto record = read_record();
-                if (record.type() == std::type_index(typeid(ufe::ObjectNullMultiple256)))
-                {
-                    // increase elements count if is a packed null object
-                    const auto obj = std::any_cast<ufe::ObjectNullMultiple256>(record);
-                    i += obj.NullCount;
-                }
-                arr.Data.push_back(record);
-            }
-            return std::move(arr);
-        } break;
-        case ufe::ERecordType::MethodCall:
-        case ufe::ERecordType::MethodReturn:
-        case ufe::ERecordType::InvalidType:
+            return get_ArraySingleString();
+
+        case ufe::ERecordType::MethodCall:   [[fallthrough]];
+        case ufe::ERecordType::MethodReturn: [[fallthrough]];
+        case ufe::ERecordType::InvalidType:  [[fallthrough]];
         default:
-            spdlog::debug("Record type {:x} not implemented!", static_cast<uint8_t>(rec));
-            spdlog::debug("filepos: {}", m_file.tellg());
+            record_type_not_implemented(rec);
             break;
     }
     return {};
+}
+
+std::any BinaryFileParser::get_ArraySingleString()
+{
+    ufe::ArraySingleString arr;
+    read(arr);
+    spdlog::debug("array_single_string  id {}, elements count {}", arr.ObjectId, arr.Length);
+    for (int i = 0; i < arr.Length; ++i)
+    {
+        auto record = read_record();
+        if (record.type() == std::type_index(typeid(ufe::ObjectNullMultiple256)))
+        {
+            // increase elements count if is a packed null object
+            const auto obj = std::any_cast<ufe::ObjectNullMultiple256>(record);
+            i += obj.NullCount;
+        }
+        arr.Data.push_back(record);
+    }
+    return arr;
+}
+
+std::any BinaryFileParser::get_ArraySinglePrimitive()
+{
+    ufe::ArraySinglePrimitive arr;
+    read(arr);
+    for (int i = 0; i < arr.Length; ++i)
+    {
+        nlohmann::ordered_json tmp;
+        auto x = arr.PrimitiveTypeEnum;
+        read_primitive_element(x);
+    }
+    return arr;
+}
+
+std::any BinaryFileParser::get_ObjectNullMultiple256()
+{
+    ufe::ObjectNullMultiple256 obj;
+    obj.NullCount = read<uint8_t>();
+    spdlog::debug("null_multiple_256 count: {}", obj.NullCount);
+    return obj;
+}
+
+std::any BinaryFileParser::get_BinaryLibrary()
+{
+    ufe::BinaryLibrary bl;
+    read(bl);
+    add_record(bl.LibraryId.value, std::any{ bl });
+    return bl;
+}
+
+std::any BinaryFileParser::get_MemberReference()
+{
+    ufe::MemberReference ref;
+    read(ref);
+    spdlog::debug("reference id: {}", ref.m_idRef);
+    return ref;
+}
+
+std::any BinaryFileParser::get_BinaryArray()
+{
+    ufe::BinaryArray ba;
+    read(ba);
+    if (ba.Rank > 1)
+    {
+        spdlog::error("multidimensional array");
+        return {};
+    }
+    spdlog::debug("binary array id {}, elements type '{}'", ba.ObjectId, ufe::EBinaryTypeEnumeration2str(ba.TypeEnum));
+    for (int i = 0; i < ba.Lengths[0]; ++i)
+    {
+        switch (ba.TypeEnum)
+        {
+        case ufe::EBinaryTypeEnumeration::Primitive:
+            ba.Data.emplace_back(read_primitive_element(std::get<ufe::EPrimitiveTypeEnumeration>(ba.AdditionalTypeInfo)));
+            break;
+        case ufe::EBinaryTypeEnumeration::String:
+            break;
+        case ufe::EBinaryTypeEnumeration::Object:
+            break;
+        case ufe::EBinaryTypeEnumeration::SystemClass:
+            break;
+        case ufe::EBinaryTypeEnumeration::Class:
+        {
+            ba.Data.emplace_back(read_record());
+        } break;
+        case ufe::EBinaryTypeEnumeration::ObjectArray:
+            break;
+        case ufe::EBinaryTypeEnumeration::StringArray:
+            break;
+        case ufe::EBinaryTypeEnumeration::PrimitiveArray:
+            break;
+        case ufe::EBinaryTypeEnumeration::None:
+            break;
+        default:
+            break;
+        }
+    }
+    return ba;
+}
+
+std::any BinaryFileParser::get_BinaryObjectString()
+{
+    ufe::BinaryObjectString bos;
+    read(bos);
+    spdlog::debug("object string id: {}, value: '{}'", bos.m_ObjectId, bos.m_Value.value.string);
+    add_record(bos.m_ObjectId, std::any{ bos });
+    return bos;
+}
+
+std::any BinaryFileParser::get_ClassWithMembersAndTypes()
+{
+    ufe::ClassWithMembersAndTypes cmt;
+    read(cmt);
+    add_record(cmt.m_ClassInfo.ObjectId.value, std::any{ cmt });
+    return cmt;
+}
+
+std::any BinaryFileParser::get_SystemClassWithMembersAndTypes()
+{
+    ufe::ClassWithMembersAndTypes cmt;
+    read(cmt, true);
+    add_record(cmt.m_ClassInfo.ObjectId.value, std::any{ cmt });
+    return cmt;
+}
+
+std::any BinaryFileParser::get_ClassWithId()
+{
+    ufe::ClassWithId cwi;
+    read(cwi);
+    return cwi;
+}
+
+std::any BinaryFileParser::get_SerializedStreamHeader()
+{
+    ufe::SerializationHeaderRecord rec;
+    read(rec);
+    return rec;
 }
 
 std::any BinaryFileParser::read_primitive_element(ufe::EPrimitiveTypeEnumeration type)
@@ -358,7 +419,7 @@ bool BinaryFileParser::read(ufe::ClassInfo& ci)
     read(ci.ObjectId);
     read(ci.Name);
     read(ci.MemberCount);
-    ci.MemberNames.resize(ci.MemberCount.m_data);
+    ci.MemberNames.resize(ci.MemberCount.value);
     std::for_each(ci.MemberNames.begin(), ci.MemberNames.end(),
         [this](auto& data)
         {
@@ -372,13 +433,13 @@ bool BinaryFileParser::read(ufe::ClassWithMembersAndTypes& cmt, bool system_clas
     read(cmt.m_ClassInfo);
     auto& mti = cmt.m_MemberTypeInfo;
 
-    for (int i = 0; i < cmt.m_ClassInfo.MemberCount.m_data; ++i)
+    for (int i = 0; i < cmt.m_ClassInfo.MemberCount.value; ++i)
     {
         mti.BinaryTypeEnums.push_back(static_cast<ufe::EBinaryTypeEnumeration>(read()));
     }
-    spdlog::debug("class name: {}", cmt.m_ClassInfo.Name.m_data.m_str);
-    spdlog::debug("class id: {}", cmt.m_ClassInfo.ObjectId.m_data);
-    spdlog::debug("members count: {}", cmt.m_ClassInfo.MemberCount.m_data);
+    spdlog::debug("class name: {}", cmt.m_ClassInfo.Name.value.string);
+    spdlog::debug("class id: {}", cmt.m_ClassInfo.ObjectId.value);
+    spdlog::debug("members count: {}", cmt.m_ClassInfo.MemberCount.value);
     for (auto type : mti.BinaryTypeEnums)
     {
         switch (type)
@@ -448,8 +509,8 @@ bool BinaryFileParser::read(ufe::LengthPrefixedString& lps)
         if ((seg & 0x80) == 0x00) break;
     }
     lps.m_original_len = len;
-    lps.m_str.resize(len);
-    m_file.read(lps.m_str.data(), len);
+    lps.string.resize(len);
+    m_file.read(lps.string.data(), len);
     return true;
 }
 
@@ -474,7 +535,7 @@ bool BinaryFileParser::read(ufe::ClassWithId& cmt)
 
     read(obj_id);
     read(cmt.MetadataId);
-    const auto& ref_class = get_record(cmt.MetadataId.m_data);
+    const auto& ref_class = get_record(cmt.MetadataId.value);
     if (ref_class.has_value())
     {
         const auto& ref = std::any_cast<const ufe::ClassWithMembersAndTypes&>(ref_class);
@@ -703,8 +764,8 @@ std::vector<char> BinaryFileParser::raw_data() const
 template<>
 bool BinaryFileParser::read<ufe::LengthPrefixedString>(IndexedData<ufe::LengthPrefixedString>& data)
 {
-    data.m_offset = m_file.tellg();
-    read(data.m_data);
+    data.offset = m_file.tellg();
+    read(data.value);
     return true;
 }
 

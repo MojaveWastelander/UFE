@@ -32,7 +32,7 @@ public:
     EFileType file_type() const noexcept { return m_file_type; }
 
     const std::vector<std::any>& get_records() const noexcept { return m_root_records; }
-    std::string compressed_header() const noexcept { return m_compressed_header; }
+    std::string header() const noexcept { return m_header; }
 
     void read_records();
 
@@ -68,7 +68,7 @@ private:
     {
         IndexedData<T> tmp;
         read(tmp);
-        spdlog::debug("\t{} = {}", it_member_names->m_data.m_str, tmp.m_data);
+        spdlog::debug("\t{} = {}", it_member_names->value.string, tmp.value);
         mti.Data.push_back(std::any{ tmp });
     }
     
@@ -76,8 +76,8 @@ private:
     bool read(IndexedData<T>& data)
     {
         static_assert(std::is_fundamental_v<T>, "Type doesn't have specialization");
-        data.m_offset = m_file.tellg();
-        m_file.read(reinterpret_cast<char*>(&data.m_data), sizeof(data.m_data));
+        data.offset = m_file.tellg();
+        m_file.read(reinterpret_cast<char*>(&data.value), sizeof(data.value));
         return true;
     }
 
@@ -101,6 +101,29 @@ private:
     std::any read_primitive_element(ufe::EPrimitiveTypeEnumeration type);
     const std::any& get_record(int32_t id);
     std::any read_record();
+
+    std::any get_ArraySingleString();
+
+    std::any get_ArraySinglePrimitive();
+
+    std::any get_ObjectNullMultiple256();
+
+    std::any get_BinaryLibrary();
+
+    std::any get_MemberReference();
+
+    std::any get_BinaryArray();
+
+    std::any get_BinaryObjectString();
+
+    std::any get_ClassWithMembersAndTypes();
+
+    std::any get_SystemClassWithMembersAndTypes();
+
+    std::any get_ClassWithId();
+
+    std::any get_SerializedStreamHeader();
+
     void add_record(int32_t id, std::any&& record)
     {
         m_records.emplace_back(std::make_pair(id, record));
@@ -116,7 +139,7 @@ private:
     fs::path m_file_path;
     EFileStatus m_status = EFileStatus::Empty;
     EFileType m_file_type = EFileType::Uncompressed;
-    std::string m_compressed_header;
+    std::string m_header;
     std::string m_raw_data;
     mutable std::istringstream m_file;
 };

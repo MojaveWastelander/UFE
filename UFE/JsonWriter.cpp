@@ -79,10 +79,10 @@ bool JsonWriter::process_records(const std::vector<std::any>& records)
 nlohmann::ordered_json JsonWriter::class_with_members_and_types(const ufe::ClassWithMembersAndTypes& cmt)
 {
     nlohmann::ordered_json cls = { {"class", {}} };
-    cls["class"]["name"] = cmt.m_ClassInfo.Name.m_data.m_str;
-    cls["class"]["id"] = cmt.m_ClassInfo.ObjectId.m_data;
+    cls["class"]["name"] = cmt.m_ClassInfo.Name.value.string;
+    cls["class"]["id"] = cmt.m_ClassInfo.ObjectId.value;
     cls["class"]["members"] = {};
-    spdlog::debug("process class {} with id {}", cmt.m_ClassInfo.Name.m_data.m_str, cmt.m_ClassInfo.ObjectId.m_data);
+    spdlog::debug("process class {} with id {}", cmt.m_ClassInfo.Name.value.string, cmt.m_ClassInfo.ObjectId.value);
     process_class_members(cls["class"]["members"], cmt.m_ClassInfo, cmt.m_MemberTypeInfo);
     return cls;
 }
@@ -92,8 +92,8 @@ void JsonWriter::process_class_members(nlohmann::ordered_json& members, const uf
     auto it_member_names = ci.MemberNames.cbegin();
     for (const auto& data : mti.Data)
     {
-        members[it_member_names->m_data.m_str] = process(data);
-        spdlog::debug("'{}' : {}", it_member_names->m_data.m_str, members[it_member_names->m_data.m_str].dump());
+        members[it_member_names->value.string] = process(data);
+        spdlog::debug("'{}' : {}", it_member_names->value.string, members[it_member_names->value.string].dump());
         ++it_member_names;
     }
 }
@@ -105,21 +105,21 @@ ojson JsonWriter::member_reference(const ufe::MemberReference& mref)
 
 ojson JsonWriter::binary_object_string(const ufe::BinaryObjectString& bos)
 {
-    // return ojson(bos.m_Value.m_data.m_str);
+    // return ojson(bos.m_Value.value.m_str);
     ojson str = nlohmann::ordered_json::value_t::object;
     str["obj_string_id"] = bos.m_ObjectId;
-    str["value"] = bos.m_Value.m_data.m_str;
+    str["value"] = bos.m_Value.value.string;
     return str;
 }
 
 ojson JsonWriter::class_with_id(const ufe::ClassWithId& cwi)
 {
     nlohmann::ordered_json cls = { {"class_id", {}} };
-    cls["class_id"]["name"] = cwi.m_ClassInfo.Name.m_data.m_str;
-    cls["class_id"]["id"] = cwi.m_ClassInfo.ObjectId.m_data;
-    cls["class_id"]["ref_id"] = cwi.MetadataId.m_data;
+    cls["class_id"]["name"] = cwi.m_ClassInfo.Name.value.string;
+    cls["class_id"]["id"] = cwi.m_ClassInfo.ObjectId.value;
+    cls["class_id"]["ref_id"] = cwi.MetadataId.value;
     cls["class_id"]["members"] = {};
-    spdlog::debug("process class_id {} with id {}", cwi.m_ClassInfo.Name.m_data.m_str, cwi.m_ClassInfo.ObjectId.m_data);
+    spdlog::debug("process class_id {} with id {}", cwi.m_ClassInfo.Name.value.string, cwi.m_ClassInfo.ObjectId.value);
     process_class_members(cls["class_id"]["members"], cwi.m_ClassInfo, cwi.m_MemberTypeInfo);
     return cls;
 }

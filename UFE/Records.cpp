@@ -70,7 +70,7 @@ std::string_view ufe::EPrimitiveTypeEnumeration2str(EPrimitiveTypeEnumeration re
 
 bool ufe::operator==(const LengthPrefixedString& lhs, const std::string& rhs)
 {
-    return lhs.m_str == rhs;
+    return lhs.string == rhs;
 }
 
 std::string_view ufe::EBinaryTypeEnumeration2str(EBinaryTypeEnumeration rec)

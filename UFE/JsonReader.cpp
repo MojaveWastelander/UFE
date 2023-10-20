@@ -83,9 +83,15 @@ bool JsonReader::patch(std::filesystem::path json_path, std::filesystem::path bi
                             spdlog::critical("Failed to compress file: {}", e.what());
                             return false;
                         }
-                        auto compressed_header = parser.compressed_header();
+                        auto compressed_header = parser.header();
                         bin.write(compressed_header.data(), compressed_header.size());
                         bin.write(compressed_data.data(), compressed_data.size());
+                    }
+                    else if (parser.file_type() == BinaryFileParser::EFileType::Uncompressed)
+                    {
+                        auto header = parser.header();
+                        bin.write(header.data(), header.size());
+                        bin.write(m_raw_data.data(), m_raw_data.size());
                     }
                     else
                     {
@@ -128,25 +134,25 @@ void JsonReader::update_strings()
             if (1)
             {
                 std::string tmp;
-                tmp.reserve(ref.m_data.m_str.size() + 5);
-                auto len = ref.m_data.m_new_len;
+                tmp.reserve(ref.value.string.size() + 5);
+                auto len = ref.value.m_new_len;
                 for (; len; len >>= 8)
                 {
                     tmp.push_back(static_cast<char>(len & 0xFF));
                 }
-                tmp.append(ref.m_data.m_str.cbegin(), ref.m_data.m_str.cend());
+                tmp.append(ref.value.string.cbegin(), ref.value.string.cend());
 
                 // erase old size
-                len = ref.m_data.m_original_len_unmod;
+                len = ref.value.m_original_len_unmod;
                 auto it = m_raw_data.begin();
                 for (; len; len >>= 8)
                 {
-                    it = m_raw_data.erase(m_raw_data.begin() + ref.m_offset);
+                    it = m_raw_data.erase(m_raw_data.begin() + ref.offset);
                 }
                 // erase old string data
-                m_raw_data.erase(it, it + ref.m_data.m_original_len);
+                m_raw_data.erase(it, it + ref.value.m_original_len);
 
-                m_raw_data.insert(m_raw_data.cbegin() + ref.m_offset, tmp.cbegin(), tmp.cend());
+                m_raw_data.insert(m_raw_data.cbegin() + ref.offset, tmp.cbegin(), tmp.cend());
             }
         });
 }
@@ -156,12 +162,12 @@ void JsonReader::binary_object_string(const ufe::BinaryObjectString& bos, const 
     if (ctx.contains("obj_string_id"))
     {
         std::string json_str = ctx["value"];
-        if (json_str != bos.m_Value.m_data.m_str)
+        if (json_str != bos.m_Value.value.string)
         {
-            spdlog::warn("orig_str: {}", bos.m_Value.m_data.m_str);
+            spdlog::warn("orig_str: {}", bos.m_Value.value.string);
             spdlog::warn("json_str: {}", json_str);
             auto lps = bos.m_Value;
-            lps.m_data.update_string(json_str);
+            lps.value.update_string(json_str);
             m_updated_strings.push_back(lps);
         }
     }
@@ -174,25 +180,25 @@ void JsonReader::class_with_members_and_types(const ufe::ClassWithMembersAndType
     {
         const auto& members = cls["members"];
         auto it_member_names = cmt.m_ClassInfo.MemberNames.cbegin();
-        spdlog::debug("Processing class '{}' with id {}", cmt.m_ClassInfo.Name.m_data.m_str, cmt.m_ClassInfo.ObjectId.m_data);
+        spdlog::debug("Processing class '{}' with id {}", cmt.m_ClassInfo.Name.value.string, cmt.m_ClassInfo.ObjectId.value);
         // check if class name was updated
         process_string(cmt.m_ClassInfo.Name, cls["name"]);
 
         for (const auto& rec : cmt.m_MemberTypeInfo.Data)
         {
             
-            if (json_elem(members, it_member_names->m_data.m_str))
+            if (json_elem(members, it_member_names->value.string))
             {
-                spdlog::debug(it_member_names->m_data.m_str);
-                process(rec, members[it_member_names->m_data.m_str]);
+                spdlog::debug(it_member_names->value.string);
+                process(rec, members[it_member_names->value.string]);
             }
             ++it_member_names;
         }
-        spdlog::debug("Done class {}", cmt.m_ClassInfo.ObjectId.m_data);
+        spdlog::debug("Done class {}", cmt.m_ClassInfo.ObjectId.value);
     }
     else
     {
-        spdlog::warn("Class '{}' with id {} not found", cmt.m_ClassInfo.Name.m_data.m_str, cmt.m_ClassInfo.ObjectId.m_data);
+        spdlog::warn("Class '{}' with id {} not found", cmt.m_ClassInfo.Name.value.string, cmt.m_ClassInfo.ObjectId.value);
     }
 }
 
@@ -203,22 +209,22 @@ void JsonReader::class_with_id(const ufe::ClassWithId& cwi, const ojson& ctx)
     {
         const auto& members = cls["members"];
         auto it_member_names = cwi.m_ClassInfo.MemberNames.cbegin();
-        spdlog::debug("Processing class_id '{}' with id {}", cwi.m_ClassInfo.Name.m_data.m_str, cwi.m_ClassInfo.ObjectId.m_data);
+        spdlog::debug("Processing class_id '{}' with id {}", cwi.m_ClassInfo.Name.value.string, cwi.m_ClassInfo.ObjectId.value);
         for (const auto& rec : cwi.m_MemberTypeInfo.Data)
         {
 
-            if (json_elem(members, it_member_names->m_data.m_str))
+            if (json_elem(members, it_member_names->value.string))
             {
-                spdlog::debug(it_member_names->m_data.m_str);
-                process(rec, members[it_member_names->m_data.m_str]);
+                spdlog::debug(it_member_names->value.string);
+                process(rec, members[it_member_names->value.string]);
             }
             ++it_member_names;
         }
-        spdlog::debug("Done class_id {}", cwi.m_ClassInfo.ObjectId.m_data);
+        spdlog::debug("Done class_id {}", cwi.m_ClassInfo.ObjectId.value);
     }
     else
     {
-        spdlog::warn("Class '{}' with id {} not found", cwi.m_ClassInfo.Name.m_data.m_str, cwi.m_ClassInfo.ObjectId.m_data);
+        spdlog::warn("Class '{}' with id {} not found", cwi.m_ClassInfo.Name.value.string, cwi.m_ClassInfo.ObjectId.value);
     }
 }
 
@@ -262,12 +268,12 @@ void JsonReader::process_array(const ojson& values, const std::vector<std::any>&
 
 void JsonReader::process_string(const IndexedData<ufe::LengthPrefixedString>& ilps, const std::string& json_string)
 {
-    if (json_string != ilps.m_data.m_str)
+    if (json_string != ilps.value.string)
     {
-        spdlog::warn("orig_str: {}", ilps.m_data.m_str);
+        spdlog::warn("orig_str: {}", ilps.value.string);
         spdlog::warn("json_str: {}", json_string);
         auto tmp = ilps;
-        tmp.m_data.update_string(json_string);
+        tmp.value.update_string(json_string);
         m_updated_strings.push_back(tmp);
     }
 
@@ -284,7 +290,7 @@ const ojson& JsonReader::find_class_by_id(const ojson& ctx, const ufe::ClassInfo
             if (rec.contains(class_type))
             {
                 auto id = rec[class_type]["id"].get<int32_t>();
-                if (id == ci.ObjectId.m_data)
+                if (id == ci.ObjectId.value)
                 {
                     return rec[class_type];
                 }

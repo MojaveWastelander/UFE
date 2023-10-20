@@ -58,21 +58,21 @@ private:
         try
         {
             T jtmp = ctx.get<T>();
-            if (data.m_data != jtmp)
+            if (data.value != jtmp)
             {
-                spdlog::warn("\t'{}' ==> '{}'", data.m_data, jtmp);
+                spdlog::warn("\t'{}' ==> '{}'", data.value, jtmp);
             }
             else
             {
-                spdlog::trace("\t'{}' ==> '{}'", data.m_data, jtmp);
+                spdlog::trace("\t'{}' ==> '{}'", data.value, jtmp);
             }
-            if (data.m_offset > m_raw_data.size())
+            if (data.offset > m_raw_data.size())
             {
                 spdlog::critical("data offset > file size, abort parsing");
                 m_stop_parsing = true;
                 return;
             }
-            memcpy(reinterpret_cast<void*>(&m_raw_data[data.m_offset]), reinterpret_cast<void*>(&jtmp), sizeof(T));
+            memcpy(reinterpret_cast<void*>(&m_raw_data[data.offset]), reinterpret_cast<void*>(&jtmp), sizeof(T));
         }
         catch (std::exception& e)
         {

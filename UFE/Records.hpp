@@ -17,7 +17,7 @@
 
 using ojson = nlohmann::ordered_json;
 // json uses double internally and float->double casts are imprecise
-// thus corverting via strings
+// thus converting via strings
 double float2str2double(float f);
 
 constexpr uint8_t GZIP_MAGIC_1 = 0x1F;
@@ -121,13 +121,13 @@ namespace ufe
 
     struct LengthPrefixedString
     {
-        std::string m_str;
+        std::string string;
         uint64_t m_original_len;
         uint64_t m_original_len_unmod;
         uint64_t m_new_len = 0;
         void update_string(const std::string& s)
         {
-            if (m_str != s)
+            if (string != s)
             {
                 uint64_t tmp = s.size();
                 for (int i = 0; tmp; tmp >>= 7, ++i)
@@ -138,7 +138,7 @@ namespace ufe
                         m_new_len |= 0x80UL << (8 * i);
                     }
                 }
-                m_str = s;
+                string = s;
             }
         }
     };
@@ -217,7 +217,6 @@ namespace ufe
         std::vector<std::any> Data;
         void reserve(int size)
         {
-            // filled by cereal
             BinaryTypeEnums.resize(size);
             // manual fill
             AdditionalInfos.reserve(size);

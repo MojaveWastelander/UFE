@@ -54,6 +54,6 @@ class BinaryFileParser;
 template <typename T>
 struct IndexedData
 {
-    size_t m_offset;
-    T m_data;
+    size_t offset;
+    T value;
 };

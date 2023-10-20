@@ -85,6 +85,10 @@ void parse_file(const fs::path& p, const CLIParser& cli)
                 {
                     spdlog::info("File '{}' is compressed, validation status '{}'", p.string(), file_status(parser.status()));
                 }
+                else if (parser.file_type() == BinaryFileParser::EFileType::Uncompressed)
+                {
+                    spdlog::info("File '{}' is uncompressed, validation status '{}'", p.string(), file_status(parser.status()));
+                }
                 else
                 {
                     spdlog::info("File '{}' is raw, validation status '{}'", p.string(), file_status(parser.status()));
@@ -160,6 +164,10 @@ void validate_directory(fs::path dir)
                 if (parser.file_type() == BinaryFileParser::EFileType::Compressed)
                 {
                     spdlog::info("File '{}' is compressed, validation status '{}'", p.path().string(), file_status(parser.status()));
+                }
+                else if (parser.file_type() == BinaryFileParser::EFileType::Uncompressed)
+                {
+                    spdlog::info("File '{}' is uncompressed, validation status '{}'", p.path().string(), file_status(parser.status()));
                 }
                 else
                 {
