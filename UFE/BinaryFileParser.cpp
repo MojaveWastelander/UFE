@@ -135,7 +135,7 @@ std::any BinaryFileParser::read_record()
     auto record_type_not_implemented = [this](ufe::ERecordType rec)
         {
             spdlog::debug("Record type {} ({:x}) not implemented!", ufe::ERecordType2str(rec), static_cast<uint8_t>(rec));
-            spdlog::debug("filepos: {}", m_file.tellg());
+            spdlog::debug("filepos: {}", static_cast<uint64_t>(m_file.tellg()));
         };
 
     switch (rec)
